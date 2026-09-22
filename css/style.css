@@ -192,9 +192,24 @@ input[type="text"] {
   padding: 6px;
 }
 
-.add-book-btn {
+.bulk-add-row {
+  display: grid;
+  grid-template-columns: 1fr 100px 70px 64px auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.bulk-add-row .bulk-name,
+.bulk-add-row .bulk-total,
+.bulk-add-row .bulk-unit,
+.bulk-add-row .bulk-count {
+  width: 100%;
+}
+
+.bulk-add-btn {
   font-size: 0.85rem;
   padding: 6px 12px;
+  white-space: nowrap;
 }
 
 .btn {
@@ -393,4 +408,19 @@ tr.final-review .phase-cell { color: var(--accent); font-weight: 600; }
   .book-row .book-unit { grid-area: unit; }
   .book-row .remove-book { grid-area: remove; width: 100%; }
   .dday-number { font-size: 2rem; min-width: 90px; }
+
+  .bulk-add-row {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "name name"
+      "total unit"
+      "count count"
+      "btn btn";
+    row-gap: 6px;
+  }
+  .bulk-add-row .bulk-name { grid-area: name; }
+  .bulk-add-row .bulk-total { grid-area: total; }
+  .bulk-add-row .bulk-unit { grid-area: unit; }
+  .bulk-add-row .bulk-count { grid-area: count; width: 100%; }
+  .bulk-add-row .bulk-add-btn { grid-area: btn; width: 100%; }
 }

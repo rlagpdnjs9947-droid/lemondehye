@@ -210,18 +210,69 @@
     });
     group.appendChild(bookList);
 
-    var addBookBtn = document.createElement("button");
-    addBookBtn.type = "button";
-    addBookBtn.className = "btn secondary add-book-btn";
-    addBookBtn.textContent = "+ 문제집 추가";
-    addBookBtn.addEventListener("click", function () {
-      subject.books.push({ id: uid(), name: "", total: null, unit: "쪽" });
+    group.appendChild(buildBulkAddRow(subject));
+
+    return group;
+  }
+
+  function buildBulkAddRow(subject) {
+    var row = document.createElement("div");
+    row.className = "bulk-add-row";
+
+    var nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.className = "bulk-name";
+    nameInput.placeholder = "문제집명 (예: 쎈 수학)";
+
+    var totalInput = document.createElement("input");
+    totalInput.type = "number";
+    totalInput.className = "bulk-total";
+    totalInput.placeholder = "권당 분량";
+    totalInput.min = "0";
+    totalInput.step = "1";
+
+    var unitInput = document.createElement("input");
+    unitInput.type = "text";
+    unitInput.className = "bulk-unit";
+    unitInput.placeholder = "단위";
+    unitInput.value = "쪽";
+
+    var countInput = document.createElement("input");
+    countInput.type = "number";
+    countInput.className = "bulk-count";
+    countInput.placeholder = "개수";
+    countInput.min = "1";
+    countInput.step = "1";
+    countInput.value = "1";
+    countInput.title = "같은 이름으로 몇 권(회독)을 한번에 추가할지";
+
+    var addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "btn secondary bulk-add-btn";
+    addBtn.textContent = "한번에 추가";
+    addBtn.addEventListener("click", function () {
+      var name = nameInput.value.trim();
+      if (!name) {
+        alert("문제집명을 입력해주세요.");
+        return;
+      }
+      var total = parseFloat(totalInput.value);
+      total = isNaN(total) ? null : total;
+      var unit = unitInput.value.trim() || "쪽";
+      var count = clampInt(countInput.value, 1, 50, 1);
+      for (var k = 0; k < count; k++) {
+        subject.books.push({ id: uid(), name: name, total: total, unit: unit });
+      }
       saveState();
       renderSubjects();
     });
-    group.appendChild(addBookBtn);
 
-    return group;
+    row.appendChild(nameInput);
+    row.appendChild(totalInput);
+    row.appendChild(unitInput);
+    row.appendChild(countInput);
+    row.appendChild(addBtn);
+    return row;
   }
 
   function buildBookRow(subject, book, idx) {
