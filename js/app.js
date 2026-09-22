@@ -5,6 +5,8 @@
   var LEGACY_STORAGE_KEY = "suneung-planner-state-v1";
 
   var els = {
+    examDate: document.getElementById("exam-date"),
+    ddayNumber: document.getElementById("dday-number"),
     subjectList: document.getElementById("subject-list"),
     addSubject: document.getElementById("add-subject"),
     generatePlan: document.getElementById("generate-plan"),
@@ -17,6 +19,7 @@
 
   function defaultState() {
     return {
+      examDate: "",
       subjects: [
         { id: uid(), name: "", books: [{ id: uid(), name: "", total: null, unit: "쪽", blockCount: null, blocks: [] }] },
       ],
@@ -45,6 +48,7 @@
   }
 
   function sanitizeState(parsed) {
+    if (typeof parsed.examDate !== "string") parsed.examDate = "";
     parsed.subjects.forEach(function (s) {
       if (!Array.isArray(s.books)) s.books = [];
       s.books.forEach(function (b) {
@@ -95,7 +99,7 @@
         };
       });
 
-      return { subjects: subjects };
+      return { examDate: v1.examDate || "", subjects: subjects };
     } catch (e) {
       return null;
     }
@@ -107,6 +111,38 @@
     } catch (e) {
       // storage unavailable; ignore
     }
+  }
+
+  // ---------- D-day ----------
+
+  function startOfDay(d) {
+    var nd = new Date(d);
+    nd.setHours(0, 0, 0, 0);
+    return nd;
+  }
+
+  function daysBetween(a, b) {
+    var MS = 24 * 60 * 60 * 1000;
+    return Math.round((startOfDay(b).getTime() - startOfDay(a).getTime()) / MS);
+  }
+
+  els.examDate.addEventListener("change", function () {
+    state.examDate = els.examDate.value;
+    saveState();
+    updateDday();
+  });
+
+  function updateDday() {
+    els.examDate.value = state.examDate || "";
+    if (!state.examDate) {
+      els.ddayNumber.textContent = "D-?";
+      return;
+    }
+    var exam = startOfDay(new Date(state.examDate + "T00:00:00"));
+    var diff = daysBetween(startOfDay(new Date()), exam);
+    if (diff > 0) els.ddayNumber.textContent = "D-" + diff;
+    else if (diff === 0) els.ddayNumber.textContent = "D-DAY";
+    else els.ddayNumber.textContent = "D+" + Math.abs(diff);
   }
 
   // ---------- distribution ----------
@@ -359,6 +395,7 @@
 
   function render() {
     renderSubjects();
+    updateDday();
 
     if (!hasPlan()) {
       els.checklistCard.hidden = true;

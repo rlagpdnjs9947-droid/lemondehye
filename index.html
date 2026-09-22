@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>수능 학습 플래너</title>
-<link rel="stylesheet" href="css/style.css?v=5">
+<link rel="stylesheet" href="css/style.css?v=6">
 </head>
 <body>
 <div class="app">
@@ -12,6 +12,16 @@
     <h1>수능 학습 플래너</h1>
     <p class="subtitle">공부할 양을 원하는 개수의 블록으로 나눠서 체크하고, 남은 분량을 확인하세요.</p>
   </header>
+
+  <section class="card" id="dday-card">
+    <div class="dday-row">
+      <div class="dday-number" id="dday-number">D-?</div>
+      <div class="dday-info">
+        <label for="exam-date">수능일</label>
+        <input type="date" id="exam-date">
+      </div>
+    </div>
+  </section>
 
   <section class="card">
     <h2>과목별 학습량</h2>
@@ -29,6 +39,6 @@
   <p id="empty-message" class="empty-message">과목과 문제집, 블록 개수를 입력한 뒤 "블록 만들기"를 눌러주세요.</p>
 </div>
 
-<script src="js/app.js?v=5"></script>
+<script src="js/app.js?v=6"></script>
 </body>
 </html>
