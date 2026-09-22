@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>수능 학습 플래너</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <h1>수능 학습 플래너</h1>
+    <p class="subtitle">공부할 양을 입력하면 D-day에 맞춰, 복습까지 고려한 하루 분량을 자동으로 짜드려요.</p>
+  </header>
+
+  <section class="card" id="dday-card">
+    <div class="dday-row">
+      <div class="dday-number" id="dday-number">D-?</div>
+      <div class="dday-info">
+        <label for="exam-date">수능일</label>
+        <input type="date" id="exam-date">
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>과목별 학습량</h2>
+    <div id="subject-list" class="subject-list"></div>
+    <button id="add-subject" class="btn secondary" type="button">+ 과목 추가</button>
+  </section>
+
+  <section class="card">
+    <h2>복습 설정</h2>
+    <div class="settings-grid">
+      <div class="field">
+        <label for="review-offset">복습 주기 (며칠 뒤에 복습할지)</label>
+        <input type="number" id="review-offset" min="1" max="14" step="1">
+        <span class="hint">예: 3이면 학습 3일 뒤 그 분량을 다시 복습해요</span>
+      </div>
+      <div class="field">
+        <label for="review-ratio">복습 비중 (%)</label>
+        <input type="number" id="review-ratio" min="0" max="100" step="5">
+        <span class="hint">그날 새로 배운 분량의 몇 %를 나중에 복습량으로 잡을지</span>
+      </div>
+      <div class="field">
+        <label for="final-review-days">마무리 복습 기간 (일)</label>
+        <input type="number" id="final-review-days" min="0" max="60" step="1">
+        <span class="hint">수능 직전 며칠은 새 진도 없이 전체 복습만 해요</span>
+      </div>
+    </div>
+    <button id="generate-plan" class="btn primary" type="button">계획 생성 / 재계산</button>
+  </section>
+
+  <section class="card" id="summary-card" hidden>
+    <h2>진행 요약</h2>
+    <div id="progress-list" class="progress-list"></div>
+  </section>
+
+  <section class="card" id="plan-card" hidden>
+    <div class="plan-header">
+      <h2>일일 계획표</h2>
+      <div class="plan-toggle">
+        <button id="show-upcoming" class="btn toggle active" type="button">앞으로 14일</button>
+        <button id="show-all" class="btn toggle" type="button">전체 보기</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="plan-table">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <p id="empty-message" class="empty-message">수능일과 과목별 학습량을 입력한 뒤 "계획 생성"을 눌러주세요.</p>
+</div>
+
+<template id="subject-row-template">
+  <div class="subject-row" data-id="">
+    <input type="text" class="subject-name" placeholder="과목/교재명 (예: 국어 문학 개념서)">
+    <input type="number" class="subject-total" placeholder="총 분량" min="0" step="1">
+    <input type="text" class="subject-unit" placeholder="단위 (쪽, 문제, 강)" value="쪽">
+    <button class="btn remove-subject" type="button" title="삭제">✕</button>
+  </div>
+</template>
+
+<script src="js/app.js"></script>
+</body>
+</html>
