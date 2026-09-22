@@ -9,9 +9,6 @@
     ddayNumber: document.getElementById("dday-number"),
     subjectList: document.getElementById("subject-list"),
     addSubject: document.getElementById("add-subject"),
-    reviewOffset: document.getElementById("review-offset"),
-    reviewRatio: document.getElementById("review-ratio"),
-    finalReviewDays: document.getElementById("final-review-days"),
     generatePlan: document.getElementById("generate-plan"),
     summaryCard: document.getElementById("summary-card"),
     progressList: document.getElementById("progress-list"),
@@ -31,11 +28,6 @@
       subjects: [
         { id: uid(), name: "", books: [{ id: uid(), name: "", total: null, unit: "쪽" }] },
       ],
-      settings: {
-        reviewOffsetDays: 3,
-        reviewRatio: 30,
-        finalReviewDays: 10,
-      },
       history: {},
     };
   }
@@ -53,7 +45,6 @@
       parsed.subjects = Array.isArray(parsed.subjects) && parsed.subjects.length
         ? parsed.subjects
         : defaultState().subjects;
-      parsed.settings = parsed.settings || defaultState().settings;
       parsed.history = parsed.history || {};
       migrateState(parsed);
       return parsed;
@@ -62,8 +53,9 @@
     }
   }
 
-  // upgrades the pre-multi-book schema (subject.total/unit, history entry
-  // newAmount/newDone/reviewAmount/reviewDone) to the books[] + segments[] shape.
+  // upgrades older schemas (single-total subjects, and/or history entries
+  // carrying newAmount/newDone/reviewAmount/reviewDone) to the current
+  // books[] + newSegments[] shape. Any old review data is dropped.
   function migrateState(parsed) {
     parsed.subjects = parsed.subjects.map(function (s) {
       if (Array.isArray(s.books)) return s;
@@ -78,16 +70,17 @@
       var dayEntry = parsed.history[key];
       Object.keys(dayEntry).forEach(function (subjId) {
         var entry = dayEntry[subjId];
-        if (!entry || entry.newSegments) return;
+        if (!entry) return;
+        if (entry.newSegments) {
+          dayEntry[subjId] = { newSegments: entry.newSegments };
+          return;
+        }
         var subj = parsed.subjects.filter(function (s) { return s.id === subjId; })[0];
         var bookId = subj && subj.books[0] ? subj.books[0].id : null;
         var newSegments = (entry.newAmount > 0 && bookId)
           ? [{ bookId: bookId, amount: entry.newAmount, done: !!entry.newDone }]
           : [];
-        var reviewSegments = (entry.reviewAmount > 0 && bookId)
-          ? [{ bookId: bookId, amount: entry.reviewAmount, done: !!entry.reviewDone }]
-          : [];
-        dayEntry[subjId] = { newSegments: newSegments, reviewSegments: reviewSegments };
+        dayEntry[subjId] = { newSegments: newSegments };
       });
     });
   }
@@ -210,69 +203,18 @@
     });
     group.appendChild(bookList);
 
-    group.appendChild(buildBulkAddRow(subject));
-
-    return group;
-  }
-
-  function buildBulkAddRow(subject) {
-    var row = document.createElement("div");
-    row.className = "bulk-add-row";
-
-    var nameInput = document.createElement("input");
-    nameInput.type = "text";
-    nameInput.className = "bulk-name";
-    nameInput.placeholder = "문제집명 (예: 쎈 수학)";
-
-    var totalInput = document.createElement("input");
-    totalInput.type = "number";
-    totalInput.className = "bulk-total";
-    totalInput.placeholder = "권당 분량";
-    totalInput.min = "0";
-    totalInput.step = "1";
-
-    var unitInput = document.createElement("input");
-    unitInput.type = "text";
-    unitInput.className = "bulk-unit";
-    unitInput.placeholder = "단위";
-    unitInput.value = "쪽";
-
-    var countInput = document.createElement("input");
-    countInput.type = "number";
-    countInput.className = "bulk-count";
-    countInput.placeholder = "개수";
-    countInput.min = "1";
-    countInput.step = "1";
-    countInput.value = "1";
-    countInput.title = "같은 이름으로 몇 권(회독)을 한번에 추가할지";
-
-    var addBtn = document.createElement("button");
-    addBtn.type = "button";
-    addBtn.className = "btn secondary bulk-add-btn";
-    addBtn.textContent = "한번에 추가";
-    addBtn.addEventListener("click", function () {
-      var name = nameInput.value.trim();
-      if (!name) {
-        alert("문제집명을 입력해주세요.");
-        return;
-      }
-      var total = parseFloat(totalInput.value);
-      total = isNaN(total) ? null : total;
-      var unit = unitInput.value.trim() || "쪽";
-      var count = clampInt(countInput.value, 1, 50, 1);
-      for (var k = 0; k < count; k++) {
-        subject.books.push({ id: uid(), name: name, total: total, unit: unit });
-      }
+    var addBookBtn = document.createElement("button");
+    addBookBtn.type = "button";
+    addBookBtn.className = "btn secondary add-book-btn";
+    addBookBtn.textContent = "+ 문제집 추가";
+    addBookBtn.addEventListener("click", function () {
+      subject.books.push({ id: uid(), name: "", total: null, unit: "쪽" });
       saveState();
       renderSubjects();
     });
+    group.appendChild(addBookBtn);
 
-    row.appendChild(nameInput);
-    row.appendChild(totalInput);
-    row.appendChild(unitInput);
-    row.appendChild(countInput);
-    row.appendChild(addBtn);
-    return row;
+    return group;
   }
 
   function buildBookRow(subject, book, idx) {
@@ -374,39 +316,13 @@
     renderSubjects();
   });
 
-  // ---------- settings UI ----------
-
-  function renderSettings() {
-    els.examDate.value = state.examDate || "";
-    els.reviewOffset.value = state.settings.reviewOffsetDays;
-    els.reviewRatio.value = state.settings.reviewRatio;
-    els.finalReviewDays.value = state.settings.finalReviewDays;
-    updateDday();
-  }
+  // ---------- exam date ----------
 
   els.examDate.addEventListener("change", function () {
     state.examDate = els.examDate.value;
     saveState();
     updateDday();
   });
-  els.reviewOffset.addEventListener("input", function () {
-    state.settings.reviewOffsetDays = clampInt(els.reviewOffset.value, 1, 30, 3);
-    saveState();
-  });
-  els.reviewRatio.addEventListener("input", function () {
-    state.settings.reviewRatio = clampInt(els.reviewRatio.value, 0, 100, 30);
-    saveState();
-  });
-  els.finalReviewDays.addEventListener("input", function () {
-    state.settings.finalReviewDays = clampInt(els.finalReviewDays.value, 0, 90, 10);
-    saveState();
-  });
-
-  function clampInt(v, min, max, fallback) {
-    var n = parseInt(v, 10);
-    if (isNaN(n)) return fallback;
-    return Math.min(max, Math.max(min, n));
-  }
 
   function updateDday() {
     if (!state.examDate) {
@@ -448,17 +364,6 @@
       return;
     }
 
-    var settings = state.settings;
-    var finalReviewDays = Math.min(settings.finalReviewDays, Math.max(totalStudyDays - 1, 0));
-    var newContentDays = totalStudyDays - finalReviewDays;
-    if (newContentDays < 1) {
-      newContentDays = 1;
-      finalReviewDays = totalStudyDays - 1;
-    }
-
-    var reviewOffset = settings.reviewOffsetDays;
-    var reviewRatio = settings.reviewRatio / 100;
-
     validSubjects.forEach(function (subject) {
       var books = subject.books.filter(function (b) { return b.total > 0; });
 
@@ -477,7 +382,7 @@
       });
 
       var totalRemaining = books.reduce(function (sum, b) { return sum + bookRemaining[b.id]; }, 0);
-      var dailyQuota = distributeEvenly(totalRemaining, newContentDays);
+      var dailyQuota = distributeEvenly(totalRemaining, totalStudyDays);
 
       // walk the books in list order, filling each day's quota from the
       // front of the queue so a book is fully finished before the next starts
@@ -486,7 +391,7 @@
         .map(function (b) { return { id: b.id, remaining: bookRemaining[b.id] }; });
 
       var newSegmentsByDay = [];
-      for (var i = 0; i < newContentDays; i++) {
+      for (var i = 0; i < totalStudyDays; i++) {
         var q = dailyQuota[i];
         var segs = [];
         while (q > 0.001 && queue.length) {
@@ -500,57 +405,19 @@
         newSegmentsByDay.push(segs);
       }
 
-      var reviewSegmentsByDay = [];
-      for (var i2 = 0; i2 < newContentDays; i2++) {
-        var srcIdx = i2 - reviewOffset;
-        if (srcIdx >= 0 && srcIdx < newContentDays) {
-          reviewSegmentsByDay.push(
-            newSegmentsByDay[srcIdx]
-              .map(function (seg) { return { bookId: seg.bookId, amount: round1(seg.amount * reviewRatio) }; })
-              .filter(function (seg) { return seg.amount > 0; })
-          );
-        } else {
-          reviewSegmentsByDay.push([]);
-        }
-      }
-
-      var finalReviewByBook = {};
-      books.forEach(function (b) {
-        finalReviewByBook[b.id] = distributeEvenly(b.total, finalReviewDays);
-      });
-
       for (var d = 0; d < totalStudyDays; d++) {
         var date = addDays(today, d);
         var key = dateKey(date);
         if (!state.history[key]) state.history[key] = {};
         var prev = state.history[key][subject.id];
         var prevNewDone = {};
-        var prevReviewDone = {};
         if (prev && prev.newSegments) {
           prev.newSegments.forEach(function (seg) { prevNewDone[seg.bookId] = seg.done; });
         }
-        if (prev && prev.reviewSegments) {
-          prev.reviewSegments.forEach(function (seg) { prevReviewDone[seg.bookId] = seg.done; });
-        }
-
-        var newSegments, reviewSegments;
-        if (d < newContentDays) {
-          newSegments = newSegmentsByDay[d];
-          reviewSegments = reviewSegmentsByDay[d];
-        } else {
-          newSegments = [];
-          var j = d - newContentDays;
-          reviewSegments = books
-            .map(function (b) { return { bookId: b.id, amount: finalReviewByBook[b.id][j] || 0 }; })
-            .filter(function (seg) { return seg.amount > 0; });
-        }
 
         state.history[key][subject.id] = {
-          newSegments: newSegments.map(function (seg) {
+          newSegments: newSegmentsByDay[d].map(function (seg) {
             return { bookId: seg.bookId, amount: seg.amount, done: !!prevNewDone[seg.bookId] };
-          }),
-          reviewSegments: reviewSegments.map(function (seg) {
-            return { bookId: seg.bookId, amount: seg.amount, done: !!prevReviewDone[seg.bookId] };
           }),
         };
       }
@@ -582,7 +449,8 @@
 
   function render() {
     renderSubjects();
-    renderSettings();
+    els.examDate.value = state.examDate || "";
+    updateDday();
 
     if (!hasPlan()) {
       els.summaryCard.hidden = true;
@@ -680,7 +548,6 @@
     thead.appendChild(headRow);
 
     tbody.innerHTML = "";
-    var checkboxHandlers = [];
 
     keys.forEach(function (key) {
       var date = new Date(key + "T00:00:00");
@@ -704,7 +571,7 @@
       tr.appendChild(tdDday);
 
       subjects.forEach(function (subject) {
-        var entry = state.history[key][subject.id] || { newSegments: [], reviewSegments: [] };
+        var entry = state.history[key][subject.id] || { newSegments: [] };
         var td = document.createElement("td");
         var stack = document.createElement("div");
         stack.className = "cell-stack";
@@ -712,16 +579,11 @@
         entry.newSegments.forEach(function (seg) {
           var book = findBook(subject, seg.bookId);
           if (!book) return;
-          stack.appendChild(buildTaskLabel(key, subject.id, seg, "new", book, "new-amt", ""));
-        });
-        entry.reviewSegments.forEach(function (seg) {
-          var book = findBook(subject, seg.bookId);
-          if (!book) return;
-          stack.appendChild(buildTaskLabel(key, subject.id, seg, "review", book, "review-amt", "복습 "));
+          stack.appendChild(buildTaskLabel(key, subject.id, seg, book));
         });
         if (!stack.children.length) {
           var dash = document.createElement("span");
-          dash.className = "review-amt";
+          dash.className = "no-task";
           dash.textContent = "-";
           stack.appendChild(dash);
         }
@@ -737,10 +599,8 @@
         var key = cb.dataset.key;
         var sid = cb.dataset.sid;
         var bookId = cb.dataset.bookId;
-        var segType = cb.dataset.segtype;
         var entry = state.history[key][sid];
-        var arr = segType === "new" ? entry.newSegments : entry.reviewSegments;
-        var seg = arr.filter(function (s) { return s.bookId === bookId; })[0];
+        var seg = entry.newSegments.filter(function (s) { return s.bookId === bookId; })[0];
         if (seg) seg.done = cb.checked;
         saveState();
         renderProgress();
@@ -748,7 +608,7 @@
     });
   }
 
-  function buildTaskLabel(key, subjectId, seg, segType, book, amtClass, prefix) {
+  function buildTaskLabel(key, subjectId, seg, book) {
     var label = document.createElement("label");
     label.className = "cell-task";
 
@@ -758,11 +618,10 @@
     cb.dataset.key = key;
     cb.dataset.sid = subjectId;
     cb.dataset.bookId = seg.bookId;
-    cb.dataset.segtype = segType;
 
     var span = document.createElement("span");
-    span.className = amtClass;
-    span.textContent = prefix + (book.name || "문제집") + " " + seg.amount + book.unit;
+    span.className = "new-amt";
+    span.textContent = (book.name || "문제집") + " " + seg.amount + book.unit;
 
     label.appendChild(cb);
     label.appendChild(span);
