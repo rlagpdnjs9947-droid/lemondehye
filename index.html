@@ -25,6 +25,7 @@
 
   <section class="card">
     <h2>과목별 학습량</h2>
+    <p class="section-hint">과목마다 문제집을 여러 권 추가할 수 있어요. 목록 순서대로(1권을 다 풀면 2권으로) 진행돼요. ▲▼ 버튼으로 순서를 바꿀 수 있어요.</p>
     <div id="subject-list" class="subject-list"></div>
     <button id="add-subject" class="btn secondary" type="button">+ 과목 추가</button>
   </section>
@@ -74,15 +75,6 @@
 
   <p id="empty-message" class="empty-message">수능일과 과목별 학습량을 입력한 뒤 "계획 생성"을 눌러주세요.</p>
 </div>
-
-<template id="subject-row-template">
-  <div class="subject-row" data-id="">
-    <input type="text" class="subject-name" placeholder="과목/교재명 (예: 국어 문학 개념서)">
-    <input type="number" class="subject-total" placeholder="총 분량" min="0" step="1">
-    <input type="text" class="subject-unit" placeholder="단위 (쪽, 문제, 강)" value="쪽">
-    <button class="btn remove-subject" type="button" title="삭제">✕</button>
-  </div>
-</template>
 
 <script src="js/app.js"></script>
 </body>

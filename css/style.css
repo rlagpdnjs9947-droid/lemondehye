@@ -105,30 +105,96 @@ input[type="text"] {
   font-size: 0.95rem;
 }
 
+.section-hint {
+  margin: -6px 0 14px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
 .subject-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 16px;
   margin-bottom: 12px;
 }
 
-.subject-row {
-  display: grid;
-  grid-template-columns: 1fr 110px 90px 36px;
-  gap: 8px;
+.subject-group {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--bg);
 }
 
-.subject-row .subject-name { width: 100%; }
-.subject-row .subject-total { width: 100%; }
-.subject-row .subject-unit { width: 100%; }
+.subject-group-header {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
 
-.remove-subject {
+.subject-group-header .subject-name {
+  flex: 1;
+  font-weight: 700;
+}
+
+.book-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.book-row {
+  display: grid;
+  grid-template-columns: 40px 1fr 100px 80px 32px;
+  gap: 6px;
+  align-items: center;
+}
+
+.book-row .book-name,
+.book-row .book-total,
+.book-row .book-unit {
+  width: 100%;
+}
+
+.book-order-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.order-btn {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.65rem;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.order-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.remove-subject-btn,
+.remove-book {
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--accent);
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+}
+
+.remove-book {
+  padding: 6px;
+}
+
+.add-book-btn {
+  font-size: 0.85rem;
+  padding: 6px 12px;
 }
 
 .btn {
@@ -193,13 +259,25 @@ input[type="text"] {
 .progress-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 18px;
+}
+
+.progress-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.progress-subject-title {
+  font-weight: 700;
+  font-size: 0.95rem;
 }
 
 .progress-item {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding-left: 8px;
 }
 
 .progress-item .name {
@@ -272,6 +350,12 @@ tr.today { background: var(--today-bg); }
 tr.weekend .date-cell { color: var(--weekend); }
 tr.final-review .phase-cell { color: var(--accent); font-weight: 600; }
 
+.cell-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
 .cell-task {
   display: flex;
   align-items: center;
@@ -295,16 +379,18 @@ tr.final-review .phase-cell { color: var(--accent); font-weight: 600; }
 }
 
 @media (max-width: 520px) {
-  .subject-row {
-    grid-template-columns: 1fr 1fr;
+  .book-row {
+    grid-template-columns: 28px 1fr 1fr;
     grid-template-areas:
-      "name name"
-      "total unit"
-      "remove remove";
+      "order name name"
+      "order total unit"
+      "order remove remove";
+    row-gap: 6px;
   }
-  .subject-row .subject-name { grid-area: name; }
-  .subject-row .subject-total { grid-area: total; }
-  .subject-row .subject-unit { grid-area: unit; }
-  .subject-row .remove-subject { grid-area: remove; width: 100%; }
+  .book-order-btns { grid-area: order; flex-direction: row; }
+  .book-row .book-name { grid-area: name; }
+  .book-row .book-total { grid-area: total; }
+  .book-row .book-unit { grid-area: unit; }
+  .book-row .remove-book { grid-area: remove; width: 100%; }
   .dday-number { font-size: 2rem; min-width: 90px; }
 }
