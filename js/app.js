@@ -3,12 +3,16 @@
 
   var STORAGE_KEY = "suneung-planner-state-v1";
   var WEEKDAY_KR = ["일", "월", "화", "수", "목", "금", "토"];
+  // Monday-first order for the weekday picker UI; values are JS getDay() indices.
+  var WEEKDAY_PICKER_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
   var els = {
     examDate: document.getElementById("exam-date"),
     ddayNumber: document.getElementById("dday-number"),
     subjectList: document.getElementById("subject-list"),
     addSubject: document.getElementById("add-subject"),
+    blackoutDays: document.getElementById("blackout-days"),
+    mockWeekdayList: document.getElementById("mock-weekday-list"),
     generatePlan: document.getElementById("generate-plan"),
     summaryCard: document.getElementById("summary-card"),
     progressList: document.getElementById("progress-list"),
@@ -26,8 +30,12 @@
     return {
       examDate: "",
       subjects: [
-        { id: uid(), name: "", books: [{ id: uid(), name: "", total: null, unit: "쪽" }] },
+        { id: uid(), name: "", mode: "sequential", books: [{ id: uid(), name: "", total: null, unit: "쪽" }] },
       ],
+      settings: {
+        blackoutDays: 7,
+        mockWeekdays: [1, 3, 5], // 월, 수, 금
+      },
       history: {},
     };
   }
@@ -45,6 +53,9 @@
       parsed.subjects = Array.isArray(parsed.subjects) && parsed.subjects.length
         ? parsed.subjects
         : defaultState().subjects;
+      parsed.settings = parsed.settings || defaultState().settings;
+      if (!Array.isArray(parsed.settings.mockWeekdays)) parsed.settings.mockWeekdays = [1, 3, 5];
+      if (typeof parsed.settings.blackoutDays !== "number") parsed.settings.blackoutDays = 7;
       parsed.history = parsed.history || {};
       migrateState(parsed);
       return parsed;
@@ -53,15 +64,19 @@
     }
   }
 
-  // upgrades older schemas (single-total subjects, and/or history entries
-  // carrying newAmount/newDone/reviewAmount/reviewDone) to the current
-  // books[] + newSegments[] shape. Any old review data is dropped.
+  // upgrades older schemas (single-total subjects, missing subject.mode,
+  // and/or history entries carrying newAmount/newDone/reviewAmount/reviewDone)
+  // to the current shape. Any old review data is dropped.
   function migrateState(parsed) {
     parsed.subjects = parsed.subjects.map(function (s) {
-      if (Array.isArray(s.books)) return s;
+      if (Array.isArray(s.books)) {
+        s.mode = s.mode === "parallel" ? "parallel" : "sequential";
+        return s;
+      }
       return {
         id: s.id || uid(),
         name: s.name || "",
+        mode: "sequential",
         books: [{ id: uid(), name: s.name || "문제집 1", total: s.total != null ? s.total : null, unit: s.unit || "쪽" }],
       };
     });
@@ -69,6 +84,7 @@
     Object.keys(parsed.history).forEach(function (key) {
       var dayEntry = parsed.history[key];
       Object.keys(dayEntry).forEach(function (subjId) {
+        if (subjId === "_mock") return;
         var entry = dayEntry[subjId];
         if (!entry) return;
         if (entry.newSegments) {
@@ -127,6 +143,15 @@
     return (d.getMonth() + 1) + "/" + d.getDate() + " (" + WEEKDAY_KR[d.getDay()] + ")";
   }
 
+  function isMockWeekday(date) {
+    return state.settings.mockWeekdays.indexOf(date.getDay()) !== -1;
+  }
+
+  function isBlackout(date, exam) {
+    var dday = daysBetween(date, exam);
+    return dday <= state.settings.blackoutDays;
+  }
+
   // ---------- distribution ----------
 
   function distributeEvenly(total, count) {
@@ -146,6 +171,12 @@
 
   function round1(n) {
     return Math.round(n * 10) / 10;
+  }
+
+  function clampInt(v, min, max, fallback) {
+    var n = parseInt(v, 10);
+    if (isNaN(n)) return fallback;
+    return Math.min(max, Math.max(min, n));
   }
 
   function findBook(subject, bookId) {
@@ -195,6 +226,34 @@
     header.appendChild(nameInput);
     header.appendChild(removeSubjectBtn);
     group.appendChild(header);
+
+    var modeRow = document.createElement("div");
+    modeRow.className = "subject-mode-row";
+
+    var modeLabel = document.createElement("span");
+    modeLabel.className = "mode-label";
+    modeLabel.textContent = "진행 방식";
+
+    var modeSelect = document.createElement("select");
+    modeSelect.className = "subject-mode";
+
+    var optSeq = document.createElement("option");
+    optSeq.value = "sequential";
+    optSeq.textContent = "순차 (1권 끝나면 2권)";
+    var optPar = document.createElement("option");
+    optPar.value = "parallel";
+    optPar.textContent = "동시 (여러 권 병행)";
+    modeSelect.appendChild(optSeq);
+    modeSelect.appendChild(optPar);
+    modeSelect.value = subject.mode === "parallel" ? "parallel" : "sequential";
+    modeSelect.addEventListener("change", function () {
+      subject.mode = modeSelect.value === "parallel" ? "parallel" : "sequential";
+      saveState();
+    });
+
+    modeRow.appendChild(modeLabel);
+    modeRow.appendChild(modeSelect);
+    group.appendChild(modeRow);
 
     var bookList = document.createElement("div");
     bookList.className = "book-list";
@@ -311,18 +370,51 @@
   }
 
   els.addSubject.addEventListener("click", function () {
-    state.subjects.push({ id: uid(), name: "", books: [{ id: uid(), name: "", total: null, unit: "쪽" }] });
+    state.subjects.push({ id: uid(), name: "", mode: "sequential", books: [{ id: uid(), name: "", total: null, unit: "쪽" }] });
     saveState();
     renderSubjects();
   });
 
-  // ---------- exam date ----------
+  // ---------- exam date & schedule settings UI ----------
 
   els.examDate.addEventListener("change", function () {
     state.examDate = els.examDate.value;
     saveState();
     updateDday();
   });
+
+  els.blackoutDays.addEventListener("input", function () {
+    state.settings.blackoutDays = clampInt(els.blackoutDays.value, 0, 30, 7);
+    saveState();
+  });
+
+  function renderScheduleSettings() {
+    els.blackoutDays.value = state.settings.blackoutDays;
+
+    els.mockWeekdayList.innerHTML = "";
+    WEEKDAY_PICKER_ORDER.forEach(function (dayNum) {
+      var pill = document.createElement("label");
+      pill.className = "weekday-pill";
+
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = state.settings.mockWeekdays.indexOf(dayNum) !== -1;
+      cb.addEventListener("change", function () {
+        var set = state.settings.mockWeekdays;
+        var idx = set.indexOf(dayNum);
+        if (cb.checked && idx === -1) set.push(dayNum);
+        if (!cb.checked && idx !== -1) set.splice(idx, 1);
+        saveState();
+      });
+
+      var span = document.createElement("span");
+      span.textContent = WEEKDAY_KR[dayNum];
+
+      pill.appendChild(cb);
+      pill.appendChild(span);
+      els.mockWeekdayList.appendChild(pill);
+    });
+  }
 
   function updateDday() {
     if (!state.examDate) {
@@ -364,6 +456,20 @@
       return;
     }
 
+    var allDates = [];
+    for (var i = 0; i < totalStudyDays; i++) allDates.push(addDays(today, i));
+
+    var assignableDates = allDates.filter(function (date) {
+      return !isBlackout(date, exam) && !isMockWeekday(date);
+    });
+
+    if (!assignableDates.length) {
+      alert("계획을 배정할 수 있는 날짜가 없어요. 제외 기간이나 실모 요일 설정을 확인해주세요.");
+      return;
+    }
+
+    var totalAssignable = assignableDates.length;
+
     validSubjects.forEach(function (subject) {
       var books = subject.books.filter(function (b) { return b.total > 0; });
 
@@ -381,32 +487,49 @@
         bookRemaining[b.id] = Math.max(round1(b.total - done), 0);
       });
 
-      var totalRemaining = books.reduce(function (sum, b) { return sum + bookRemaining[b.id]; }, 0);
-      var dailyQuota = distributeEvenly(totalRemaining, totalStudyDays);
+      var segmentsByAssignableIdx = [];
 
-      // walk the books in list order, filling each day's quota from the
-      // front of the queue so a book is fully finished before the next starts
-      var queue = books
-        .filter(function (b) { return bookRemaining[b.id] > 0; })
-        .map(function (b) { return { id: b.id, remaining: bookRemaining[b.id] }; });
-
-      var newSegmentsByDay = [];
-      for (var i = 0; i < totalStudyDays; i++) {
-        var q = dailyQuota[i];
-        var segs = [];
-        while (q > 0.001 && queue.length) {
-          var cur = queue[0];
-          var take = round1(Math.min(q, cur.remaining));
-          if (take > 0) segs.push({ bookId: cur.id, amount: take });
-          cur.remaining = round1(cur.remaining - take);
-          q = round1(q - take);
-          if (cur.remaining <= 0.001) queue.shift();
+      if (subject.mode === "parallel") {
+        // each book gets its own even spread across every assignable day,
+        // so all books in the subject progress at the same time
+        var perBookQuota = {};
+        books.forEach(function (b) {
+          perBookQuota[b.id] = distributeEvenly(bookRemaining[b.id], totalAssignable);
+        });
+        for (var pi = 0; pi < totalAssignable; pi++) {
+          var pSegs = [];
+          books.forEach(function (b) {
+            var amt = perBookQuota[b.id][pi];
+            if (amt > 0) pSegs.push({ bookId: b.id, amount: amt });
+          });
+          segmentsByAssignableIdx.push(pSegs);
         }
-        newSegmentsByDay.push(segs);
+      } else {
+        // sequential: walk the books in list order, filling each day's quota
+        // from the front of the queue so a book finishes before the next starts
+        var totalRemaining = books.reduce(function (sum, b) { return sum + bookRemaining[b.id]; }, 0);
+        var dailyQuota = distributeEvenly(totalRemaining, totalAssignable);
+        var queue = books
+          .filter(function (b) { return bookRemaining[b.id] > 0; })
+          .map(function (b) { return { id: b.id, remaining: bookRemaining[b.id] }; });
+
+        for (var si = 0; si < totalAssignable; si++) {
+          var q = dailyQuota[si];
+          var sSegs = [];
+          while (q > 0.001 && queue.length) {
+            var cur = queue[0];
+            var take = round1(Math.min(q, cur.remaining));
+            if (take > 0) sSegs.push({ bookId: cur.id, amount: take });
+            cur.remaining = round1(cur.remaining - take);
+            q = round1(q - take);
+            if (cur.remaining <= 0.001) queue.shift();
+          }
+          segmentsByAssignableIdx.push(sSegs);
+        }
       }
 
-      for (var d = 0; d < totalStudyDays; d++) {
-        var date = addDays(today, d);
+      var assignableIdx = 0;
+      allDates.forEach(function (date) {
         var key = dateKey(date);
         if (!state.history[key]) state.history[key] = {};
         var prev = state.history[key][subject.id];
@@ -415,11 +538,26 @@
           prev.newSegments.forEach(function (seg) { prevNewDone[seg.bookId] = seg.done; });
         }
 
+        var assignable = !isBlackout(date, exam) && !isMockWeekday(date);
+        var segs = assignable ? segmentsByAssignableIdx[assignableIdx++] : [];
+
         state.history[key][subject.id] = {
-          newSegments: newSegmentsByDay[d].map(function (seg) {
+          newSegments: segs.map(function (seg) {
             return { bookId: seg.bookId, amount: seg.amount, done: !!prevNewDone[seg.bookId] };
           }),
         };
+      });
+    });
+
+    // mock-exam checkbox slots, independent of subjects
+    allDates.forEach(function (date) {
+      var key = dateKey(date);
+      if (!state.history[key]) state.history[key] = {};
+      if (isMockWeekday(date)) {
+        var prevMock = state.history[key]._mock;
+        state.history[key]._mock = { done: prevMock ? !!prevMock.done : false };
+      } else {
+        delete state.history[key]._mock;
       }
     });
 
@@ -450,6 +588,7 @@
   function render() {
     renderSubjects();
     els.examDate.value = state.examDate || "";
+    renderScheduleSettings();
     updateDday();
 
     if (!hasPlan()) {
@@ -521,13 +660,12 @@
   function renderPlanTable() {
     var subjects = currentPlanSubjects();
     var today = todayDate();
+    var exam = state.examDate ? startOfDay(new Date(state.examDate + "T00:00:00")) : null;
     var allKeys = Object.keys(state.history).sort();
     var futureKeys = allKeys.filter(function (k) {
       return new Date(k + "T00:00:00") >= today;
     });
     var keys = viewMode === "upcoming" ? futureKeys.slice(0, 14) : futureKeys;
-
-    var exam = state.examDate ? startOfDay(new Date(state.examDate + "T00:00:00")) : null;
 
     var thead = els.planTable.querySelector("thead");
     var tbody = els.planTable.querySelector("tbody");
@@ -537,8 +675,11 @@
     thDate.textContent = "날짜";
     var thDday = document.createElement("th");
     thDday.textContent = "D-day";
+    var thMock = document.createElement("th");
+    thMock.textContent = "실모";
     headRow.appendChild(thDate);
     headRow.appendChild(thDday);
+    headRow.appendChild(thMock);
     subjects.forEach(function (s) {
       var th = document.createElement("th");
       th.textContent = s.name;
@@ -553,12 +694,16 @@
       var date = new Date(key + "T00:00:00");
       var isToday = dateKey(date) === dateKey(today);
       var isWeekend = date.getDay() === 0 || date.getDay() === 6;
+      var mockDay = isMockWeekday(date);
+      var blackoutDay = exam ? isBlackout(date, exam) : false;
       var dday = exam ? daysBetween(date, exam) : null;
 
       var tr = document.createElement("tr");
       var classes = [];
       if (isToday) classes.push("today");
       if (isWeekend) classes.push("weekend");
+      if (mockDay) classes.push("mockday");
+      if (blackoutDay) classes.push("blackout");
       tr.className = classes.join(" ");
 
       var tdDate = document.createElement("td");
@@ -569,6 +714,18 @@
       tdDday.textContent = ddayLabel;
       tr.appendChild(tdDate);
       tr.appendChild(tdDday);
+
+      var tdMock = document.createElement("td");
+      if (mockDay) {
+        var mockEntry = state.history[key]._mock || { done: false };
+        tdMock.appendChild(buildMockLabel(key, mockEntry));
+      } else {
+        var mockDash = document.createElement("span");
+        mockDash.className = "no-task";
+        mockDash.textContent = "-";
+        tdMock.appendChild(mockDash);
+      }
+      tr.appendChild(tdMock);
 
       subjects.forEach(function (subject) {
         var entry = state.history[key][subject.id] || { newSegments: [] };
@@ -582,10 +739,10 @@
           stack.appendChild(buildTaskLabel(key, subject.id, seg, book));
         });
         if (!stack.children.length) {
-          var dash = document.createElement("span");
-          dash.className = "no-task";
-          dash.textContent = "-";
-          stack.appendChild(dash);
+          var placeholder = document.createElement("span");
+          placeholder.className = "no-task";
+          placeholder.textContent = blackoutDay ? "정리기간" : "-";
+          stack.appendChild(placeholder);
         }
         td.appendChild(stack);
         tr.appendChild(td);
@@ -597,6 +754,11 @@
     tbody.querySelectorAll("input[type=checkbox]").forEach(function (cb) {
       cb.addEventListener("change", function () {
         var key = cb.dataset.key;
+        if (cb.dataset.mock) {
+          state.history[key]._mock = { done: cb.checked };
+          saveState();
+          return;
+        }
         var sid = cb.dataset.sid;
         var bookId = cb.dataset.bookId;
         var entry = state.history[key][sid];
@@ -622,6 +784,25 @@
     var span = document.createElement("span");
     span.className = "new-amt";
     span.textContent = (book.name || "문제집") + " " + seg.amount + book.unit;
+
+    label.appendChild(cb);
+    label.appendChild(span);
+    return label;
+  }
+
+  function buildMockLabel(key, mockEntry) {
+    var label = document.createElement("label");
+    label.className = "cell-task";
+
+    var cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = !!mockEntry.done;
+    cb.dataset.key = key;
+    cb.dataset.mock = "1";
+
+    var span = document.createElement("span");
+    span.className = "mock-amt";
+    span.textContent = "실모 응시";
 
     label.appendChild(cb);
     label.appendChild(span);
