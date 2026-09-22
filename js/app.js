@@ -1,42 +1,25 @@
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "suneung-planner-state-v1";
-  var WEEKDAY_KR = ["일", "월", "화", "수", "목", "금", "토"];
-  // Monday-first order for the weekday picker UI; values are JS getDay() indices.
-  var WEEKDAY_PICKER_ORDER = [1, 2, 3, 4, 5, 6, 0];
+  var STORAGE_KEY = "suneung-planner-state-v2";
+  var LEGACY_STORAGE_KEY = "suneung-planner-state-v1";
 
   var els = {
-    examDate: document.getElementById("exam-date"),
-    ddayNumber: document.getElementById("dday-number"),
     subjectList: document.getElementById("subject-list"),
     addSubject: document.getElementById("add-subject"),
-    blackoutDays: document.getElementById("blackout-days"),
-    mockWeekdayList: document.getElementById("mock-weekday-list"),
     generatePlan: document.getElementById("generate-plan"),
-    summaryCard: document.getElementById("summary-card"),
-    progressList: document.getElementById("progress-list"),
-    planCard: document.getElementById("plan-card"),
-    planTable: document.getElementById("plan-table"),
+    checklistCard: document.getElementById("checklist-card"),
+    checklistList: document.getElementById("checklist-list"),
     emptyMessage: document.getElementById("empty-message"),
-    showUpcoming: document.getElementById("show-upcoming"),
-    showAll: document.getElementById("show-all"),
   };
 
   var state = loadState();
-  var viewMode = "upcoming"; // 'upcoming' | 'all'
 
   function defaultState() {
     return {
-      examDate: "",
       subjects: [
-        { id: uid(), name: "", mode: "sequential", books: [{ id: uid(), name: "", total: null, unit: "쪽" }] },
+        { id: uid(), name: "", books: [{ id: uid(), name: "", total: null, unit: "쪽", blockCount: null, blocks: [] }] },
       ],
-      settings: {
-        blackoutDays: 7,
-        mockWeekdays: [1, 3, 5], // 월, 수, 금
-      },
-      history: {},
     };
   }
 
@@ -47,58 +30,75 @@
   function loadState() {
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return defaultState();
-      var parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== "object") return defaultState();
-      parsed.subjects = Array.isArray(parsed.subjects) && parsed.subjects.length
-        ? parsed.subjects
-        : defaultState().subjects;
-      parsed.settings = parsed.settings || defaultState().settings;
-      if (!Array.isArray(parsed.settings.mockWeekdays)) parsed.settings.mockWeekdays = [1, 3, 5];
-      if (typeof parsed.settings.blackoutDays !== "number") parsed.settings.blackoutDays = 7;
-      parsed.history = parsed.history || {};
-      migrateState(parsed);
-      return parsed;
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object" && Array.isArray(parsed.subjects) && parsed.subjects.length) {
+          sanitizeState(parsed);
+          return parsed;
+        }
+      }
+      var legacy = migrateFromLegacy();
+      return legacy || defaultState();
     } catch (e) {
       return defaultState();
     }
   }
 
-  // upgrades older schemas (single-total subjects, missing subject.mode,
-  // and/or history entries carrying newAmount/newDone/reviewAmount/reviewDone)
-  // to the current shape. Any old review data is dropped.
-  function migrateState(parsed) {
-    parsed.subjects = parsed.subjects.map(function (s) {
-      if (Array.isArray(s.books)) {
-        s.mode = s.mode === "parallel" ? "parallel" : "sequential";
-        return s;
-      }
-      return {
-        id: s.id || uid(),
-        name: s.name || "",
-        mode: "sequential",
-        books: [{ id: uid(), name: s.name || "문제집 1", total: s.total != null ? s.total : null, unit: s.unit || "쪽" }],
-      };
-    });
-
-    Object.keys(parsed.history).forEach(function (key) {
-      var dayEntry = parsed.history[key];
-      Object.keys(dayEntry).forEach(function (subjId) {
-        if (subjId === "_mock") return;
-        var entry = dayEntry[subjId];
-        if (!entry) return;
-        if (entry.newSegments) {
-          dayEntry[subjId] = { newSegments: entry.newSegments };
-          return;
-        }
-        var subj = parsed.subjects.filter(function (s) { return s.id === subjId; })[0];
-        var bookId = subj && subj.books[0] ? subj.books[0].id : null;
-        var newSegments = (entry.newAmount > 0 && bookId)
-          ? [{ bookId: bookId, amount: entry.newAmount, done: !!entry.newDone }]
-          : [];
-        dayEntry[subjId] = { newSegments: newSegments };
+  function sanitizeState(parsed) {
+    parsed.subjects.forEach(function (s) {
+      if (!Array.isArray(s.books)) s.books = [];
+      s.books.forEach(function (b) {
+        if (!Array.isArray(b.blocks)) b.blocks = [];
       });
     });
+  }
+
+  // one-time upgrade from the old date/calendar-based schema: carries over
+  // subject/book names, totals and units, and seeds each book's completed
+  // amount from any previously-checked daily segments so progress isn't lost.
+  function migrateFromLegacy() {
+    try {
+      var raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (!raw) return null;
+      var v1 = JSON.parse(raw);
+      if (!v1 || !Array.isArray(v1.subjects)) return null;
+
+      var subjects = v1.subjects.map(function (s) {
+        var books = Array.isArray(s.books) && s.books.length
+          ? s.books
+          : [{ id: uid(), name: s.name || "문제집 1", total: s.total != null ? s.total : null, unit: s.unit || "쪽" }];
+
+        return {
+          id: s.id || uid(),
+          name: s.name || "",
+          books: books.map(function (b) {
+            var done = 0;
+            var history = v1.history || {};
+            Object.keys(history).forEach(function (key) {
+              var entry = history[key] && history[key][s.id];
+              if (entry && entry.newSegments) {
+                entry.newSegments.forEach(function (seg) {
+                  if (seg.bookId === b.id && seg.done) done += seg.amount || 0;
+                });
+              }
+            });
+            return {
+              id: b.id || uid(),
+              name: b.name || "",
+              total: b.total != null ? b.total : null,
+              unit: b.unit || "쪽",
+              blockCount: null,
+              blocks: [],
+              carriedDone: done > 0 ? Math.round(done * 10) / 10 : 0,
+            };
+          }),
+        };
+      });
+
+      return { subjects: subjects };
+    } catch (e) {
+      return null;
+    }
   }
 
   function saveState() {
@@ -107,49 +107,6 @@
     } catch (e) {
       // storage unavailable; ignore
     }
-  }
-
-  // ---------- date helpers ----------
-
-  function startOfDay(d) {
-    var nd = new Date(d);
-    nd.setHours(0, 0, 0, 0);
-    return nd;
-  }
-
-  function todayDate() {
-    return startOfDay(new Date());
-  }
-
-  function addDays(date, n) {
-    var nd = new Date(date);
-    nd.setDate(nd.getDate() + n);
-    return nd;
-  }
-
-  function daysBetween(a, b) {
-    var MS = 24 * 60 * 60 * 1000;
-    return Math.round((startOfDay(b).getTime() - startOfDay(a).getTime()) / MS);
-  }
-
-  function dateKey(d) {
-    var y = d.getFullYear();
-    var m = String(d.getMonth() + 1).padStart(2, "0");
-    var day = String(d.getDate()).padStart(2, "0");
-    return y + "-" + m + "-" + day;
-  }
-
-  function formatShort(d) {
-    return (d.getMonth() + 1) + "/" + d.getDate() + " (" + WEEKDAY_KR[d.getDay()] + ")";
-  }
-
-  function isMockWeekday(date) {
-    return state.settings.mockWeekdays.indexOf(date.getDay()) !== -1;
-  }
-
-  function isBlackout(date, exam) {
-    var dday = daysBetween(date, exam);
-    return dday <= state.settings.blackoutDays;
   }
 
   // ---------- distribution ----------
@@ -171,19 +128,6 @@
 
   function round1(n) {
     return Math.round(n * 10) / 10;
-  }
-
-  function clampInt(v, min, max, fallback) {
-    var n = parseInt(v, 10);
-    if (isNaN(n)) return fallback;
-    return Math.min(max, Math.max(min, n));
-  }
-
-  function findBook(subject, bookId) {
-    for (var i = 0; i < subject.books.length; i++) {
-      if (subject.books[i].id === bookId) return subject.books[i];
-    }
-    return null;
   }
 
   // ---------- subjects UI ----------
@@ -227,34 +171,6 @@
     header.appendChild(removeSubjectBtn);
     group.appendChild(header);
 
-    var modeRow = document.createElement("div");
-    modeRow.className = "subject-mode-row";
-
-    var modeLabel = document.createElement("span");
-    modeLabel.className = "mode-label";
-    modeLabel.textContent = "진행 방식";
-
-    var modeSelect = document.createElement("select");
-    modeSelect.className = "subject-mode";
-
-    var optSeq = document.createElement("option");
-    optSeq.value = "sequential";
-    optSeq.textContent = "순차 (1권 끝나면 2권)";
-    var optPar = document.createElement("option");
-    optPar.value = "parallel";
-    optPar.textContent = "동시 (여러 권 병행)";
-    modeSelect.appendChild(optSeq);
-    modeSelect.appendChild(optPar);
-    modeSelect.value = subject.mode === "parallel" ? "parallel" : "sequential";
-    modeSelect.addEventListener("change", function () {
-      subject.mode = modeSelect.value === "parallel" ? "parallel" : "sequential";
-      saveState();
-    });
-
-    modeRow.appendChild(modeLabel);
-    modeRow.appendChild(modeSelect);
-    group.appendChild(modeRow);
-
     var bookList = document.createElement("div");
     bookList.className = "book-list";
     subject.books.forEach(function (book, idx) {
@@ -267,7 +183,7 @@
     addBookBtn.className = "btn secondary add-book-btn";
     addBookBtn.textContent = "+ 문제집 추가";
     addBookBtn.addEventListener("click", function () {
-      subject.books.push({ id: uid(), name: "", total: null, unit: "쪽" });
+      subject.books.push({ id: uid(), name: "", total: null, unit: "쪽", blockCount: null, blocks: [] });
       saveState();
       renderSubjects();
     });
@@ -350,6 +266,20 @@
       saveState();
     });
 
+    var blockCountInput = document.createElement("input");
+    blockCountInput.type = "number";
+    blockCountInput.className = "book-block-count";
+    blockCountInput.placeholder = "블록 수";
+    blockCountInput.min = "1";
+    blockCountInput.step = "1";
+    blockCountInput.title = "총 분량을 몇 개의 블록으로 나눌지";
+    blockCountInput.value = book.blockCount === null || book.blockCount === undefined ? "" : book.blockCount;
+    blockCountInput.addEventListener("input", function () {
+      var v = parseInt(blockCountInput.value, 10);
+      book.blockCount = isNaN(v) || v < 1 ? null : v;
+      saveState();
+    });
+
     var removeBtn = document.createElement("button");
     removeBtn.type = "button";
     removeBtn.className = "remove-book";
@@ -365,448 +295,157 @@
     row.appendChild(nameInput);
     row.appendChild(totalInput);
     row.appendChild(unitInput);
+    row.appendChild(blockCountInput);
     row.appendChild(removeBtn);
     return row;
   }
 
   els.addSubject.addEventListener("click", function () {
-    state.subjects.push({ id: uid(), name: "", mode: "sequential", books: [{ id: uid(), name: "", total: null, unit: "쪽" }] });
+    state.subjects.push({ id: uid(), name: "", books: [{ id: uid(), name: "", total: null, unit: "쪽", blockCount: null, blocks: [] }] });
     saveState();
     renderSubjects();
   });
 
-  // ---------- exam date & schedule settings UI ----------
-
-  els.examDate.addEventListener("change", function () {
-    state.examDate = els.examDate.value;
-    saveState();
-    updateDday();
-  });
-
-  els.blackoutDays.addEventListener("input", function () {
-    state.settings.blackoutDays = clampInt(els.blackoutDays.value, 0, 30, 7);
-    saveState();
-  });
-
-  function renderScheduleSettings() {
-    els.blackoutDays.value = state.settings.blackoutDays;
-
-    els.mockWeekdayList.innerHTML = "";
-    WEEKDAY_PICKER_ORDER.forEach(function (dayNum) {
-      var pill = document.createElement("label");
-      pill.className = "weekday-pill";
-
-      var cb = document.createElement("input");
-      cb.type = "checkbox";
-      cb.checked = state.settings.mockWeekdays.indexOf(dayNum) !== -1;
-      cb.addEventListener("change", function () {
-        var set = state.settings.mockWeekdays;
-        var idx = set.indexOf(dayNum);
-        if (cb.checked && idx === -1) set.push(dayNum);
-        if (!cb.checked && idx !== -1) set.splice(idx, 1);
-        saveState();
-      });
-
-      var span = document.createElement("span");
-      span.textContent = WEEKDAY_KR[dayNum];
-
-      pill.appendChild(cb);
-      pill.appendChild(span);
-      els.mockWeekdayList.appendChild(pill);
-    });
-  }
-
-  function updateDday() {
-    if (!state.examDate) {
-      els.ddayNumber.textContent = "D-?";
-      return;
-    }
-    var exam = startOfDay(new Date(state.examDate + "T00:00:00"));
-    var diff = daysBetween(todayDate(), exam);
-    if (diff > 0) els.ddayNumber.textContent = "D-" + diff;
-    else if (diff === 0) els.ddayNumber.textContent = "D-DAY";
-    else els.ddayNumber.textContent = "D+" + Math.abs(diff);
-  }
-
-  // ---------- plan generation ----------
+  // ---------- block generation ----------
 
   function currentPlanSubjects() {
     return state.subjects.filter(function (s) {
-      return s.name && s.books.some(function (b) { return b.total > 0; });
+      return s.name && s.books.some(function (b) { return b.blocks && b.blocks.length; });
     });
   }
 
   function generatePlan() {
-    if (!state.examDate) {
-      alert("수능일을 먼저 입력해주세요.");
-      return;
-    }
-    var validSubjects = currentPlanSubjects();
-    if (!validSubjects.length) {
-      alert("과목명과 문제집별 총 분량을 하나 이상 입력해주세요.");
-      return;
-    }
+    var eligibleBooks = 0;
+    state.subjects.forEach(function (subject) {
+      if (!subject.name) return;
+      subject.books.forEach(function (book) {
+        if (!(book.total > 0) || !(book.blockCount > 0)) {
+          book.blocks = [];
+          return;
+        }
+        eligibleBooks++;
 
-    var today = todayDate();
-    var exam = startOfDay(new Date(state.examDate + "T00:00:00"));
-    var totalStudyDays = daysBetween(today, exam); // days strictly before exam day
+        var previousDone = book.blocks
+          ? book.blocks.reduce(function (sum, blk) { return blk.done ? sum + blk.amount : sum; }, 0)
+          : 0;
+        if (book.carriedDone) previousDone = Math.max(previousDone, book.carriedDone);
 
-    if (totalStudyDays <= 0) {
-      alert("수능일이 오늘이거나 이미 지났어요. 날짜를 확인해주세요.");
-      return;
-    }
-
-    var allDates = [];
-    for (var i = 0; i < totalStudyDays; i++) allDates.push(addDays(today, i));
-
-    var assignableDates = allDates.filter(function (date) {
-      return !isBlackout(date, exam) && !isMockWeekday(date);
-    });
-
-    if (!assignableDates.length) {
-      alert("계획을 배정할 수 있는 날짜가 없어요. 제외 기간이나 실모 요일 설정을 확인해주세요.");
-      return;
-    }
-
-    var totalAssignable = assignableDates.length;
-
-    validSubjects.forEach(function (subject) {
-      var books = subject.books.filter(function (b) { return b.total > 0; });
-
-      var bookRemaining = {};
-      books.forEach(function (b) {
-        var done = 0;
-        Object.keys(state.history).forEach(function (key) {
-          var entry = state.history[key][subject.id];
-          if (entry && entry.newSegments) {
-            entry.newSegments.forEach(function (seg) {
-              if (seg.bookId === b.id && seg.done) done += seg.amount || 0;
-            });
-          }
+        var amounts = distributeEvenly(book.total, book.blockCount);
+        var cumulative = 0;
+        book.blocks = amounts.map(function (amt) {
+          cumulative = round1(cumulative + amt);
+          return { amount: amt, done: cumulative <= previousDone + 0.001 };
         });
-        bookRemaining[b.id] = Math.max(round1(b.total - done), 0);
-      });
-
-      var segmentsByAssignableIdx = [];
-
-      if (subject.mode === "parallel") {
-        // each book gets its own even spread across every assignable day,
-        // so all books in the subject progress at the same time
-        var perBookQuota = {};
-        books.forEach(function (b) {
-          perBookQuota[b.id] = distributeEvenly(bookRemaining[b.id], totalAssignable);
-        });
-        for (var pi = 0; pi < totalAssignable; pi++) {
-          var pSegs = [];
-          books.forEach(function (b) {
-            var amt = perBookQuota[b.id][pi];
-            if (amt > 0) pSegs.push({ bookId: b.id, amount: amt });
-          });
-          segmentsByAssignableIdx.push(pSegs);
-        }
-      } else {
-        // sequential: walk the books in list order, filling each day's quota
-        // from the front of the queue so a book finishes before the next starts
-        var totalRemaining = books.reduce(function (sum, b) { return sum + bookRemaining[b.id]; }, 0);
-        var dailyQuota = distributeEvenly(totalRemaining, totalAssignable);
-        var queue = books
-          .filter(function (b) { return bookRemaining[b.id] > 0; })
-          .map(function (b) { return { id: b.id, remaining: bookRemaining[b.id] }; });
-
-        for (var si = 0; si < totalAssignable; si++) {
-          var q = dailyQuota[si];
-          var sSegs = [];
-          while (q > 0.001 && queue.length) {
-            var cur = queue[0];
-            var take = round1(Math.min(q, cur.remaining));
-            if (take > 0) sSegs.push({ bookId: cur.id, amount: take });
-            cur.remaining = round1(cur.remaining - take);
-            q = round1(q - take);
-            if (cur.remaining <= 0.001) queue.shift();
-          }
-          segmentsByAssignableIdx.push(sSegs);
-        }
-      }
-
-      var assignableIdx = 0;
-      allDates.forEach(function (date) {
-        var key = dateKey(date);
-        if (!state.history[key]) state.history[key] = {};
-        var prev = state.history[key][subject.id];
-        var prevNewDone = {};
-        if (prev && prev.newSegments) {
-          prev.newSegments.forEach(function (seg) { prevNewDone[seg.bookId] = seg.done; });
-        }
-
-        var assignable = !isBlackout(date, exam) && !isMockWeekday(date);
-        var segs = assignable ? segmentsByAssignableIdx[assignableIdx++] : [];
-
-        state.history[key][subject.id] = {
-          newSegments: segs.map(function (seg) {
-            return { bookId: seg.bookId, amount: seg.amount, done: !!prevNewDone[seg.bookId] };
-          }),
-        };
+        delete book.carriedDone;
       });
     });
 
-    // mock-exam checkbox slots, independent of subjects
-    allDates.forEach(function (date) {
-      var key = dateKey(date);
-      if (!state.history[key]) state.history[key] = {};
-      if (isMockWeekday(date)) {
-        var prevMock = state.history[key]._mock;
-        state.history[key]._mock = { done: prevMock ? !!prevMock.done : false };
-      } else {
-        delete state.history[key]._mock;
-      }
-    });
+    if (!eligibleBooks) {
+      alert("과목명, 문제집 총 분량, 블록 수를 모두 입력해주세요.");
+      return;
+    }
 
     saveState();
     render();
   }
 
   els.generatePlan.addEventListener("click", generatePlan);
-  els.showUpcoming.addEventListener("click", function () {
-    viewMode = "upcoming";
-    els.showUpcoming.classList.add("active");
-    els.showAll.classList.remove("active");
-    renderPlanTable();
-  });
-  els.showAll.addEventListener("click", function () {
-    viewMode = "all";
-    els.showAll.classList.add("active");
-    els.showUpcoming.classList.remove("active");
-    renderPlanTable();
-  });
 
   // ---------- rendering ----------
 
   function hasPlan() {
-    return Object.keys(state.history).length > 0;
+    return currentPlanSubjects().length > 0;
   }
 
   function render() {
     renderSubjects();
-    els.examDate.value = state.examDate || "";
-    renderScheduleSettings();
-    updateDday();
 
     if (!hasPlan()) {
-      els.summaryCard.hidden = true;
-      els.planCard.hidden = true;
+      els.checklistCard.hidden = true;
       els.emptyMessage.hidden = false;
       return;
     }
 
     els.emptyMessage.hidden = true;
-    els.summaryCard.hidden = false;
-    els.planCard.hidden = false;
-    renderProgress();
-    renderPlanTable();
+    els.checklistCard.hidden = false;
+    renderChecklist();
   }
 
-  function renderProgress() {
-    var subjects = currentPlanSubjects();
-    els.progressList.innerHTML = "";
-    subjects.forEach(function (subject) {
-      var group = document.createElement("div");
-      group.className = "progress-group";
+  function renderChecklist() {
+    els.checklistList.innerHTML = "";
+    currentPlanSubjects().forEach(function (subject) {
+      var books = subject.books.filter(function (b) { return b.blocks && b.blocks.length; });
+      if (!books.length) return;
+
+      var subjDiv = document.createElement("div");
+      subjDiv.className = "subject-checklist";
 
       var title = document.createElement("div");
-      title.className = "progress-subject-title";
+      title.className = "subject-checklist-title";
       title.textContent = subject.name;
-      group.appendChild(title);
+      subjDiv.appendChild(title);
 
-      subject.books.filter(function (b) { return b.total > 0; }).forEach(function (book) {
-        var done = 0;
-        Object.keys(state.history).forEach(function (key) {
-          var entry = state.history[key][subject.id];
-          if (entry && entry.newSegments) {
-            entry.newSegments.forEach(function (seg) {
-              if (seg.bookId === book.id && seg.done) done += seg.amount || 0;
-            });
-          }
-        });
-        var pct = book.total > 0 ? Math.min(100, Math.round((done / book.total) * 100)) : 0;
-
-        var item = document.createElement("div");
-        item.className = "progress-item";
-
-        var nameSpan = document.createElement("span");
-        nameSpan.className = "name";
-        nameSpan.textContent = book.name || "문제집";
-
-        var bar = document.createElement("div");
-        bar.className = "progress-bar";
-        var fill = document.createElement("div");
-        fill.className = "progress-bar-fill";
-        fill.style.width = pct + "%";
-        bar.appendChild(fill);
-
-        var pctSpan = document.createElement("span");
-        pctSpan.className = "pct";
-        pctSpan.textContent = round1(done) + " / " + book.total + book.unit + " (" + pct + "%)";
-
-        item.appendChild(nameSpan);
-        item.appendChild(bar);
-        item.appendChild(pctSpan);
-        group.appendChild(item);
+      books.forEach(function (book) {
+        subjDiv.appendChild(buildBookChecklist(subject, book));
       });
 
-      els.progressList.appendChild(group);
+      els.checklistList.appendChild(subjDiv);
     });
   }
 
-  function renderPlanTable() {
-    var subjects = currentPlanSubjects();
-    var today = todayDate();
-    var exam = state.examDate ? startOfDay(new Date(state.examDate + "T00:00:00")) : null;
-    var allKeys = Object.keys(state.history).sort();
-    var futureKeys = allKeys.filter(function (k) {
-      return new Date(k + "T00:00:00") >= today;
-    });
-    var keys = viewMode === "upcoming" ? futureKeys.slice(0, 14) : futureKeys;
+  function buildBookChecklist(subject, book) {
+    var wrap = document.createElement("div");
+    wrap.className = "book-checklist";
 
-    var thead = els.planTable.querySelector("thead");
-    var tbody = els.planTable.querySelector("tbody");
+    var done = book.blocks.reduce(function (sum, blk) { return blk.done ? sum + blk.amount : sum; }, 0);
+    var pct = book.total > 0 ? Math.min(100, Math.round((done / book.total) * 100)) : 0;
+    var remaining = Math.max(round1(book.total - done), 0);
 
-    var headRow = document.createElement("tr");
-    var thDate = document.createElement("th");
-    thDate.textContent = "날짜";
-    var thDday = document.createElement("th");
-    thDday.textContent = "D-day";
-    var thMock = document.createElement("th");
-    thMock.textContent = "실모";
-    headRow.appendChild(thDate);
-    headRow.appendChild(thDday);
-    headRow.appendChild(thMock);
-    subjects.forEach(function (s) {
-      var th = document.createElement("th");
-      th.textContent = s.name;
-      headRow.appendChild(th);
-    });
-    thead.innerHTML = "";
-    thead.appendChild(headRow);
+    var header = document.createElement("div");
+    header.className = "book-checklist-header";
+    var nameSpan = document.createElement("span");
+    nameSpan.className = "name";
+    nameSpan.textContent = book.name || "문제집";
+    var statSpan = document.createElement("span");
+    statSpan.className = "pct";
+    statSpan.textContent = "남은 " + remaining + book.unit + " / 총 " + book.total + book.unit + " (" + pct + "%)";
+    header.appendChild(nameSpan);
+    header.appendChild(statSpan);
+    wrap.appendChild(header);
 
-    tbody.innerHTML = "";
+    var bar = document.createElement("div");
+    bar.className = "progress-bar";
+    var fill = document.createElement("div");
+    fill.className = "progress-bar-fill";
+    fill.style.width = pct + "%";
+    bar.appendChild(fill);
+    wrap.appendChild(bar);
 
-    keys.forEach(function (key) {
-      var date = new Date(key + "T00:00:00");
-      var isToday = dateKey(date) === dateKey(today);
-      var isWeekend = date.getDay() === 0 || date.getDay() === 6;
-      var mockDay = isMockWeekday(date);
-      var blackoutDay = exam ? isBlackout(date, exam) : false;
-      var dday = exam ? daysBetween(date, exam) : null;
+    var grid = document.createElement("div");
+    grid.className = "block-grid";
+    book.blocks.forEach(function (block, idx) {
+      var chip = document.createElement("label");
+      chip.className = "block-chip" + (block.done ? " done" : "");
 
-      var tr = document.createElement("tr");
-      var classes = [];
-      if (isToday) classes.push("today");
-      if (isWeekend) classes.push("weekend");
-      if (mockDay) classes.push("mockday");
-      if (blackoutDay) classes.push("blackout");
-      tr.className = classes.join(" ");
-
-      var tdDate = document.createElement("td");
-      tdDate.className = "date-cell";
-      tdDate.textContent = formatShort(date) + (isToday ? " · 오늘" : "");
-      var tdDday = document.createElement("td");
-      var ddayLabel = dday === 0 ? "D-DAY" : dday > 0 ? "D-" + dday : "D+" + Math.abs(dday);
-      tdDday.textContent = ddayLabel;
-      tr.appendChild(tdDate);
-      tr.appendChild(tdDday);
-
-      var tdMock = document.createElement("td");
-      if (mockDay) {
-        var mockEntry = state.history[key]._mock || { done: false };
-        tdMock.appendChild(buildMockLabel(key, mockEntry));
-      } else {
-        var mockDash = document.createElement("span");
-        mockDash.className = "no-task";
-        mockDash.textContent = "-";
-        tdMock.appendChild(mockDash);
-      }
-      tr.appendChild(tdMock);
-
-      subjects.forEach(function (subject) {
-        var entry = state.history[key][subject.id] || { newSegments: [] };
-        var td = document.createElement("td");
-        var stack = document.createElement("div");
-        stack.className = "cell-stack";
-
-        entry.newSegments.forEach(function (seg) {
-          var book = findBook(subject, seg.bookId);
-          if (!book) return;
-          stack.appendChild(buildTaskLabel(key, subject.id, seg, book));
-        });
-        if (!stack.children.length) {
-          var placeholder = document.createElement("span");
-          placeholder.className = "no-task";
-          placeholder.textContent = blackoutDay ? "정리기간" : "-";
-          stack.appendChild(placeholder);
-        }
-        td.appendChild(stack);
-        tr.appendChild(td);
-      });
-
-      tbody.appendChild(tr);
-    });
-
-    tbody.querySelectorAll("input[type=checkbox]").forEach(function (cb) {
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = !!block.done;
       cb.addEventListener("change", function () {
-        var key = cb.dataset.key;
-        if (cb.dataset.mock) {
-          state.history[key]._mock = { done: cb.checked };
-          saveState();
-          return;
-        }
-        var sid = cb.dataset.sid;
-        var bookId = cb.dataset.bookId;
-        var entry = state.history[key][sid];
-        var seg = entry.newSegments.filter(function (s) { return s.bookId === bookId; })[0];
-        if (seg) seg.done = cb.checked;
+        block.done = cb.checked;
         saveState();
-        renderProgress();
+        renderChecklist();
       });
+
+      var span = document.createElement("span");
+      span.textContent = (idx + 1) + ") " + block.amount + book.unit;
+
+      chip.appendChild(cb);
+      chip.appendChild(span);
+      grid.appendChild(chip);
     });
-  }
+    wrap.appendChild(grid);
 
-  function buildTaskLabel(key, subjectId, seg, book) {
-    var label = document.createElement("label");
-    label.className = "cell-task";
-
-    var cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = !!seg.done;
-    cb.dataset.key = key;
-    cb.dataset.sid = subjectId;
-    cb.dataset.bookId = seg.bookId;
-
-    var span = document.createElement("span");
-    span.className = "new-amt";
-    span.textContent = (book.name || "문제집") + " " + seg.amount + book.unit;
-
-    label.appendChild(cb);
-    label.appendChild(span);
-    return label;
-  }
-
-  function buildMockLabel(key, mockEntry) {
-    var label = document.createElement("label");
-    label.className = "cell-task";
-
-    var cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = !!mockEntry.done;
-    cb.dataset.key = key;
-    cb.dataset.mock = "1";
-
-    var span = document.createElement("span");
-    span.className = "mock-amt";
-    span.textContent = "실모 응시";
-
-    label.appendChild(cb);
-    label.appendChild(span);
-    return label;
+    return wrap;
   }
 
   // ---------- init ----------

@@ -8,8 +8,6 @@
   --primary-dark: #2843d1;
   --accent: #ff6b6b;
   --success: #22c55e;
-  --today-bg: #eef2ff;
-  --weekend: #ef4444;
   --radius: 12px;
 }
 
@@ -24,8 +22,6 @@
     --primary-dark: #8494ff;
     --accent: #ff8787;
     --success: #4ade80;
-    --today-bg: #232a4d;
-    --weekend: #ff8787;
   }
 }
 
@@ -69,86 +65,14 @@ body {
   font-size: 1.1rem;
 }
 
-.dday-row {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-
-.dday-number {
-  font-size: 2.4rem;
-  font-weight: 800;
-  color: var(--primary);
-  min-width: 110px;
-}
-
-.dday-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.dday-info label {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-}
-
-input[type="date"],
 input[type="number"],
-input[type="text"],
-select {
+input[type="text"] {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 10px;
   color: var(--text);
   font-size: 0.95rem;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 14px;
-}
-
-.field:last-of-type {
-  margin-bottom: 16px;
-}
-
-.field label {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.field .hint {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-}
-
-.weekday-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.weekday-pill {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 0.85rem;
-  cursor: pointer;
-  background: var(--bg);
-}
-
-.weekday-pill input[type="checkbox"] {
-  width: 15px;
-  height: 15px;
-  cursor: pointer;
 }
 
 .section-hint {
@@ -182,23 +106,6 @@ select {
   font-weight: 700;
 }
 
-.subject-mode-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.mode-label {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-}
-
-.subject-mode {
-  font-size: 0.85rem;
-  padding: 5px 8px;
-}
-
 .book-list {
   display: flex;
   flex-direction: column;
@@ -208,14 +115,15 @@ select {
 
 .book-row {
   display: grid;
-  grid-template-columns: 40px 1fr 100px 80px 32px;
+  grid-template-columns: 40px 1fr 90px 64px 80px 32px;
   gap: 6px;
   align-items: center;
 }
 
 .book-row .book-name,
 .book-row .book-total,
-.book-row .book-unit {
+.book-row .book-unit,
+.book-row .book-block-count {
   width: 100%;
 }
 
@@ -282,57 +190,54 @@ select {
   color: var(--text-muted);
 }
 
-.btn.toggle {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  padding: 6px 12px;
-}
-
-.btn.toggle.active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: white;
-}
-
 #generate-plan {
   margin-top: 12px;
 }
 
-.progress-list {
+.checklist-list {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 22px;
 }
 
-.progress-group {
+.subject-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.subject-checklist-title {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.book-checklist {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding-left: 4px;
 }
 
-.progress-subject-title {
-  font-weight: 700;
-  font-size: 0.95rem;
-}
-
-.progress-item {
+.book-checklist-header {
   display: flex;
-  align-items: center;
+  justify-content: space-between;
+  align-items: baseline;
   gap: 10px;
-  padding-left: 8px;
+  flex-wrap: wrap;
 }
 
-.progress-item .name {
-  min-width: 140px;
-  font-size: 0.9rem;
+.book-checklist-header .name {
+  font-size: 0.92rem;
   font-weight: 600;
 }
 
+.book-checklist-header .pct {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
 .progress-bar {
-  flex: 1;
-  height: 10px;
+  height: 8px;
   background: var(--bg);
   border-radius: 6px;
   overflow: hidden;
@@ -344,80 +249,35 @@ select {
   background: var(--success);
 }
 
-.progress-item .pct {
-  min-width: 70px;
-  text-align: right;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-}
-
-.plan-header {
+.block-grid {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.plan-header h2 { margin: 0; }
-
-.plan-toggle { display: flex; gap: 6px; }
-
-.table-wrap {
-  overflow-x: auto;
-}
-
-table {
-  border-collapse: collapse;
-  width: 100%;
-  font-size: 0.88rem;
-}
-
-thead th {
-  position: sticky;
-  top: 0;
-  background: var(--card-bg);
-  border-bottom: 2px solid var(--border);
-  padding: 8px 10px;
-  text-align: left;
-  white-space: nowrap;
-}
-
-tbody td {
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-}
-
-tr.today { background: var(--today-bg); }
-tr.weekend .date-cell { color: var(--weekend); }
-tr.mockday { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-tr.blackout { opacity: 0.55; }
-tr.blackout.today { opacity: 0.8; }
-
-.mock-amt { font-weight: 600; color: var(--accent); }
-
-.cell-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.cell-task {
-  display: flex;
-  align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  margin-top: 2px;
 }
 
-.cell-task .new-amt { font-weight: 600; }
-.no-task { color: var(--text-muted); }
-
-.cell-task input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
+.block-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 9px;
+  font-size: 0.82rem;
+  background: var(--card-bg);
   cursor: pointer;
+}
+
+.block-chip input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.block-chip.done {
+  border-color: var(--success);
+  color: var(--text-muted);
+  text-decoration: line-through;
 }
 
 .empty-message {
@@ -426,12 +286,13 @@ tr.blackout.today { opacity: 0.8; }
   padding: 24px 0;
 }
 
-@media (max-width: 520px) {
+@media (max-width: 560px) {
   .book-row {
     grid-template-columns: 28px 1fr 1fr;
     grid-template-areas:
       "order name name"
       "order total unit"
+      "order blocks blocks"
       "order remove remove";
     row-gap: 6px;
   }
@@ -439,6 +300,6 @@ tr.blackout.today { opacity: 0.8; }
   .book-row .book-name { grid-area: name; }
   .book-row .book-total { grid-area: total; }
   .book-row .book-unit { grid-area: unit; }
+  .book-row .book-block-count { grid-area: blocks; }
   .book-row .remove-book { grid-area: remove; width: 100%; }
-  .dday-number { font-size: 2rem; min-width: 90px; }
 }
