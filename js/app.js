@@ -26,6 +26,7 @@
     return {
       examDate: "",
       calendarMarks: {},
+      calendarNotes: {},
       subjects: [
         { id: uid(), name: "", books: [{ id: uid(), name: "", total: null, unit: "쪽", blockCount: null, blocks: [] }] },
       ],
@@ -56,6 +57,7 @@
   function sanitizeState(parsed) {
     if (typeof parsed.examDate !== "string") parsed.examDate = "";
     if (!parsed.calendarMarks || typeof parsed.calendarMarks !== "object") parsed.calendarMarks = {};
+    if (!parsed.calendarNotes || typeof parsed.calendarNotes !== "object") parsed.calendarNotes = {};
     parsed.subjects.forEach(function (s) {
       if (!Array.isArray(s.books)) s.books = [];
       s.books.forEach(function (b) {
@@ -106,7 +108,7 @@
         };
       });
 
-      return { examDate: v1.examDate || "", calendarMarks: {}, subjects: subjects };
+      return { examDate: v1.examDate || "", calendarMarks: {}, calendarNotes: {}, subjects: subjects };
     } catch (e) {
       return null;
     }
@@ -241,6 +243,14 @@
       inner.appendChild(back);
       cell.appendChild(inner);
 
+      var note = state.calendarNotes[key];
+      var noteBtn = document.createElement("button");
+      noteBtn.type = "button";
+      noteBtn.className = "calendar-note-btn" + (note ? " has-note" : "");
+      noteBtn.textContent = note ? "📝" : "+";
+      noteBtn.title = note || "메모 추가";
+      cell.appendChild(noteBtn);
+
       // update the clicked cell in place (toggle a class, swap the back-face
       // text) instead of re-rendering the whole grid, so the CSS flip
       // transition actually has a before/after state to animate between
@@ -254,6 +264,23 @@
           cellEl.classList.toggle("flipped", !!next);
         };
       }(key, cell, markSpan));
+
+      noteBtn.addEventListener("click", function (clickedKey, btnEl, cellDate) {
+        return function (e) {
+          e.stopPropagation();
+          var label = (cellDate.getMonth() + 1) + "/" + cellDate.getDate() + " 메모";
+          var current = state.calendarNotes[clickedKey] || "";
+          var input = window.prompt(label, current);
+          if (input === null) return;
+          var trimmed = input.trim();
+          if (trimmed) state.calendarNotes[clickedKey] = trimmed;
+          else delete state.calendarNotes[clickedKey];
+          saveState();
+          btnEl.textContent = trimmed ? "📝" : "+";
+          btnEl.title = trimmed || "메모 추가";
+          btnEl.classList.toggle("has-note", !!trimmed);
+        };
+      }(key, noteBtn, cellDate));
 
       els.calendarGrid.appendChild(cell);
     }

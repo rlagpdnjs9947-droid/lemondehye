@@ -193,6 +193,32 @@ body {
   border-color: var(--accent);
 }
 
+.calendar-note-btn {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--card-bg);
+  color: var(--text-muted);
+  font-size: 0.55rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.calendar-note-btn.has-note {
+  font-size: 0.6rem;
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 15%, var(--card-bg));
+}
+
 .calendar-date {
   font-size: 0.72rem;
   color: var(--text-muted);
