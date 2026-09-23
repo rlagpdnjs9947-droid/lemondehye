@@ -202,32 +202,44 @@
     for (var day = 1; day <= daysInMonth; day++) {
       var cellDate = new Date(year, month, day);
       var key = dateKey(cellDate);
+      var mark = state.calendarMarks[key];
+
       var cell = document.createElement("div");
       var classes = ["calendar-cell"];
       if (dateKey(today) === key) classes.push("today");
       if (exam && dateKey(exam) === key) classes.push("exam");
+      if (mark) classes.push("flipped");
       cell.className = classes.join(" ");
+
+      var inner = document.createElement("div");
+      inner.className = "calendar-cell-inner";
+
+      var front = document.createElement("div");
+      front.className = "cell-face cell-front";
 
       var dateSpan = document.createElement("span");
       dateSpan.className = "calendar-date";
       dateSpan.textContent = day;
-      cell.appendChild(dateSpan);
+      front.appendChild(dateSpan);
 
       if (exam) {
         var ddaySpan = document.createElement("span");
         ddaySpan.className = "calendar-dday";
         var diff = daysBetween(cellDate, exam);
         ddaySpan.textContent = diff === 0 ? "D-DAY" : diff > 0 ? "D-" + diff : "D+" + Math.abs(diff);
-        cell.appendChild(ddaySpan);
+        front.appendChild(ddaySpan);
       }
 
-      var mark = state.calendarMarks[key];
-      if (mark) {
-        var markSpan = document.createElement("span");
-        markSpan.className = "calendar-mark";
-        markSpan.textContent = mark;
-        cell.appendChild(markSpan);
-      }
+      var back = document.createElement("div");
+      back.className = "cell-face cell-back";
+      var markSpan = document.createElement("span");
+      markSpan.className = "calendar-mark";
+      markSpan.textContent = mark || "";
+      back.appendChild(markSpan);
+
+      inner.appendChild(front);
+      inner.appendChild(back);
+      cell.appendChild(inner);
 
       cell.addEventListener("click", function (clickedKey) {
         return function () {

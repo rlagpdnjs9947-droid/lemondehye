@@ -136,6 +136,32 @@ body {
 
 .calendar-cell {
   aspect-ratio: 1;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  perspective: 400px;
+}
+
+.calendar-cell.empty {
+  visibility: hidden;
+  cursor: default;
+}
+
+.calendar-cell-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.45s cubic-bezier(0.4, 0.2, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.calendar-cell.flipped .calendar-cell-inner {
+  transform: rotateY(180deg);
+}
+
+.cell-face {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -144,24 +170,26 @@ body {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg);
-  cursor: pointer;
-  user-select: none;
-  position: relative;
+  backface-visibility: hidden;
 }
 
-.calendar-cell.empty {
-  visibility: hidden;
-  cursor: default;
-  border: none;
+.cell-back {
+  transform: rotateY(180deg);
+  background: color-mix(in srgb, var(--primary) 12%, var(--card-bg));
+  border-color: var(--primary);
 }
 
-.calendar-cell.today {
+.calendar-cell.today .cell-front {
   border-color: var(--primary);
   border-width: 2px;
 }
 
-.calendar-cell.exam {
+.calendar-cell.exam .cell-front {
   background: color-mix(in srgb, var(--accent) 20%, var(--card-bg));
+  border-color: var(--accent);
+}
+
+.calendar-cell.exam .cell-back {
   border-color: var(--accent);
 }
 
@@ -181,7 +209,7 @@ body {
 }
 
 .calendar-mark {
-  font-size: 1.05rem;
+  font-size: 1.4rem;
   line-height: 1;
 }
 
