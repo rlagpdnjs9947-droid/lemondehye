@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>수능 학습 플래너</title>
+<link rel="stylesheet" href="css/style.css?v=6">
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <h1>수능 학습 플래너</h1>
+    <p class="subtitle">공부할 양을 원하는 개수의 블록으로 나눠서 체크하고, 남은 분량을 확인하세요.</p>
+  </header>
+
+  <section class="card" id="dday-card">
+    <div class="dday-row">
+      <div class="dday-number" id="dday-number">D-?</div>
+      <div class="dday-info">
+        <label for="exam-date">수능일</label>
+        <input type="date" id="exam-date">
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>과목별 학습량</h2>
+    <p class="section-hint">과목마다 문제집을 여러 권 추가할 수 있어요. 문제집마다 "블록 개수"를 정하면 총 분량을 그 개수만큼 균등하게 나눠서 체크리스트를 만들어요. ▲▼ 버튼으로 문제집 순서를 바꿀 수 있어요.</p>
+    <div id="subject-list" class="subject-list"></div>
+    <button id="add-subject" class="btn secondary" type="button">+ 과목 추가</button>
+    <button id="generate-plan" class="btn primary" type="button">블록 만들기 / 재계산</button>
+  </section>
+
+  <section class="card" id="checklist-card" hidden>
+    <h2>학습 체크리스트</h2>
+    <div id="checklist-list" class="checklist-list"></div>
+  </section>
+
+  <p id="empty-message" class="empty-message">과목과 문제집, 블록 개수를 입력한 뒤 "블록 만들기"를 눌러주세요.</p>
+</div>
+
+<script src="js/app.js?v=6"></script>
+</body>
+</html>
