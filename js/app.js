@@ -7,6 +7,10 @@
   var els = {
     examDate: document.getElementById("exam-date"),
     ddayNumber: document.getElementById("dday-number"),
+    calendarTitle: document.getElementById("calendar-title"),
+    calendarGrid: document.getElementById("calendar-grid"),
+    calendarPrev: document.getElementById("calendar-prev"),
+    calendarNext: document.getElementById("calendar-next"),
     subjectList: document.getElementById("subject-list"),
     addSubject: document.getElementById("add-subject"),
     generatePlan: document.getElementById("generate-plan"),
@@ -16,10 +20,12 @@
   };
 
   var state = loadState();
+  var calendarCursor = { year: new Date().getFullYear(), month: new Date().getMonth() }; // month is 0-indexed, not persisted
 
   function defaultState() {
     return {
       examDate: "",
+      calendarMarks: {},
       subjects: [
         { id: uid(), name: "", books: [{ id: uid(), name: "", total: null, unit: "쪽", blockCount: null, blocks: [] }] },
       ],
@@ -49,6 +55,7 @@
 
   function sanitizeState(parsed) {
     if (typeof parsed.examDate !== "string") parsed.examDate = "";
+    if (!parsed.calendarMarks || typeof parsed.calendarMarks !== "object") parsed.calendarMarks = {};
     parsed.subjects.forEach(function (s) {
       if (!Array.isArray(s.books)) s.books = [];
       s.books.forEach(function (b) {
@@ -99,7 +106,7 @@
         };
       });
 
-      return { examDate: v1.examDate || "", subjects: subjects };
+      return { examDate: v1.examDate || "", calendarMarks: {}, subjects: subjects };
     } catch (e) {
       return null;
     }
@@ -126,10 +133,18 @@
     return Math.round((startOfDay(b).getTime() - startOfDay(a).getTime()) / MS);
   }
 
+  function dateKey(d) {
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
+  }
+
   els.examDate.addEventListener("change", function () {
     state.examDate = els.examDate.value;
     saveState();
     updateDday();
+    renderCalendar();
   });
 
   function updateDday() {
@@ -143,6 +158,89 @@
     if (diff > 0) els.ddayNumber.textContent = "D-" + diff;
     else if (diff === 0) els.ddayNumber.textContent = "D-DAY";
     else els.ddayNumber.textContent = "D+" + Math.abs(diff);
+  }
+
+  // ---------- calendar ----------
+
+  var MARK_CYCLE = [null, "✕", "⭐", "🔥", "✅"];
+
+  function nextMark(current) {
+    var idx = MARK_CYCLE.indexOf(current || null);
+    if (idx === -1) idx = 0;
+    return MARK_CYCLE[(idx + 1) % MARK_CYCLE.length];
+  }
+
+  els.calendarPrev.addEventListener("click", function () {
+    calendarCursor.month--;
+    if (calendarCursor.month < 0) { calendarCursor.month = 11; calendarCursor.year--; }
+    renderCalendar();
+  });
+  els.calendarNext.addEventListener("click", function () {
+    calendarCursor.month++;
+    if (calendarCursor.month > 11) { calendarCursor.month = 0; calendarCursor.year++; }
+    renderCalendar();
+  });
+
+  function renderCalendar() {
+    var year = calendarCursor.year;
+    var month = calendarCursor.month;
+    els.calendarTitle.textContent = year + "년 " + (month + 1) + "월";
+
+    var today = startOfDay(new Date());
+    var exam = state.examDate ? startOfDay(new Date(state.examDate + "T00:00:00")) : null;
+    var firstWeekday = new Date(year, month, 1).getDay();
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    els.calendarGrid.innerHTML = "";
+
+    for (var i = 0; i < firstWeekday; i++) {
+      var blank = document.createElement("div");
+      blank.className = "calendar-cell empty";
+      els.calendarGrid.appendChild(blank);
+    }
+
+    for (var day = 1; day <= daysInMonth; day++) {
+      var cellDate = new Date(year, month, day);
+      var key = dateKey(cellDate);
+      var cell = document.createElement("div");
+      var classes = ["calendar-cell"];
+      if (dateKey(today) === key) classes.push("today");
+      if (exam && dateKey(exam) === key) classes.push("exam");
+      cell.className = classes.join(" ");
+
+      var dateSpan = document.createElement("span");
+      dateSpan.className = "calendar-date";
+      dateSpan.textContent = day;
+      cell.appendChild(dateSpan);
+
+      if (exam) {
+        var ddaySpan = document.createElement("span");
+        ddaySpan.className = "calendar-dday";
+        var diff = daysBetween(cellDate, exam);
+        ddaySpan.textContent = diff === 0 ? "D-DAY" : diff > 0 ? "D-" + diff : "D+" + Math.abs(diff);
+        cell.appendChild(ddaySpan);
+      }
+
+      var mark = state.calendarMarks[key];
+      if (mark) {
+        var markSpan = document.createElement("span");
+        markSpan.className = "calendar-mark";
+        markSpan.textContent = mark;
+        cell.appendChild(markSpan);
+      }
+
+      cell.addEventListener("click", function (clickedKey) {
+        return function () {
+          var next = nextMark(state.calendarMarks[clickedKey]);
+          if (next) state.calendarMarks[clickedKey] = next;
+          else delete state.calendarMarks[clickedKey];
+          saveState();
+          renderCalendar();
+        };
+      }(key));
+
+      els.calendarGrid.appendChild(cell);
+    }
   }
 
   // ---------- distribution ----------
@@ -396,6 +494,7 @@
   function render() {
     renderSubjects();
     updateDday();
+    renderCalendar();
 
     if (!hasPlan()) {
       els.checklistCard.hidden = true;

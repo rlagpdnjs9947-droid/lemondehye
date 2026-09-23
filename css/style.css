@@ -8,6 +8,7 @@
   --primary-dark: #2843d1;
   --accent: #ff6b6b;
   --success: #22c55e;
+  --today-bg: #eef2ff;
   --radius: 12px;
 }
 
@@ -22,6 +23,7 @@
     --primary-dark: #8494ff;
     --accent: #ff8787;
     --success: #4ade80;
+    --today-bg: #232a4d;
   }
 }
 
@@ -88,6 +90,103 @@ body {
 .dday-info label {
   font-size: 0.85rem;
   color: var(--text-muted);
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.calendar-title {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.calendar-nav-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.calendar-weekdays span {
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.calendar-cell {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+
+.calendar-cell.empty {
+  visibility: hidden;
+  cursor: default;
+  border: none;
+}
+
+.calendar-cell.today {
+  border-color: var(--primary);
+  border-width: 2px;
+}
+
+.calendar-cell.exam {
+  background: color-mix(in srgb, var(--accent) 20%, var(--card-bg));
+  border-color: var(--accent);
+}
+
+.calendar-date {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.calendar-cell.exam .calendar-date {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.calendar-dday {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+}
+
+.calendar-mark {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.calendar-hint {
+  margin: 10px 0 0;
 }
 
 input[type="date"],

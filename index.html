@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>수능 학습 플래너</title>
-<link rel="stylesheet" href="css/style.css?v=6">
+<link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
 <div class="app">
@@ -23,6 +23,19 @@
     </div>
   </section>
 
+  <section class="card" id="calendar-card">
+    <div class="calendar-header">
+      <button id="calendar-prev" class="calendar-nav-btn" type="button" aria-label="이전 달">‹</button>
+      <div class="calendar-title" id="calendar-title">-</div>
+      <button id="calendar-next" class="calendar-nav-btn" type="button" aria-label="다음 달">›</button>
+    </div>
+    <div class="calendar-weekdays">
+      <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+    </div>
+    <div class="calendar-grid" id="calendar-grid"></div>
+    <p class="section-hint calendar-hint">날짜를 탭하면 ✕ → ⭐ → 🔥 → ✅ → 없음 순서로 표시가 바뀌어요.</p>
+  </section>
+
   <section class="card">
     <h2>과목별 학습량</h2>
     <p class="section-hint">과목마다 문제집을 여러 권 추가할 수 있어요. 문제집마다 "블록 개수"를 정하면 총 분량을 그 개수만큼 균등하게 나눠서 체크리스트를 만들어요. ▲▼ 버튼으로 문제집 순서를 바꿀 수 있어요.</p>
@@ -39,6 +52,6 @@
   <p id="empty-message" class="empty-message">과목과 문제집, 블록 개수를 입력한 뒤 "블록 만들기"를 눌러주세요.</p>
 </div>
 
-<script src="js/app.js?v=6"></script>
+<script src="js/app.js?v=7"></script>
 </body>
 </html>
