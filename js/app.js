@@ -241,15 +241,19 @@
       inner.appendChild(back);
       cell.appendChild(inner);
 
-      cell.addEventListener("click", function (clickedKey) {
+      // update the clicked cell in place (toggle a class, swap the back-face
+      // text) instead of re-rendering the whole grid, so the CSS flip
+      // transition actually has a before/after state to animate between
+      cell.addEventListener("click", function (clickedKey, cellEl, markEl) {
         return function () {
           var next = nextMark(state.calendarMarks[clickedKey]);
           if (next) state.calendarMarks[clickedKey] = next;
           else delete state.calendarMarks[clickedKey];
           saveState();
-          renderCalendar();
+          markEl.textContent = next || "";
+          cellEl.classList.toggle("flipped", !!next);
         };
-      }(key));
+      }(key, cell, markSpan));
 
       els.calendarGrid.appendChild(cell);
     }
