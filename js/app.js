@@ -205,6 +205,7 @@
       var cellDate = new Date(year, month, day);
       var key = dateKey(cellDate);
       var mark = state.calendarMarks[key];
+      var note = state.calendarNotes[key];
 
       var cell = document.createElement("div");
       var classes = ["calendar-cell"];
@@ -231,6 +232,7 @@
         ddaySpan.textContent = diff === 0 ? "D-DAY" : diff > 0 ? "D-" + diff : "D+" + Math.abs(diff);
         front.appendChild(ddaySpan);
       }
+      if (note) front.appendChild(buildNoteTextSpan(note));
 
       var back = document.createElement("div");
       back.className = "cell-face cell-back";
@@ -238,12 +240,12 @@
       markSpan.className = "calendar-mark";
       markSpan.textContent = mark || "";
       back.appendChild(markSpan);
+      if (note) back.appendChild(buildNoteTextSpan(note));
 
       inner.appendChild(front);
       inner.appendChild(back);
       cell.appendChild(inner);
 
-      var note = state.calendarNotes[key];
       var noteBtn = document.createElement("button");
       noteBtn.type = "button";
       noteBtn.className = "calendar-note-btn" + (note ? " has-note" : "");
@@ -265,7 +267,7 @@
         };
       }(key, cell, markSpan));
 
-      noteBtn.addEventListener("click", function (clickedKey, btnEl, cellDate) {
+      noteBtn.addEventListener("click", function (clickedKey, cellDate) {
         return function (e) {
           e.stopPropagation();
           var label = (cellDate.getMonth() + 1) + "/" + cellDate.getDate() + " 메모";
@@ -276,14 +278,19 @@
           if (trimmed) state.calendarNotes[clickedKey] = trimmed;
           else delete state.calendarNotes[clickedKey];
           saveState();
-          btnEl.textContent = trimmed ? "📝" : "+";
-          btnEl.title = trimmed || "메모 추가";
-          btnEl.classList.toggle("has-note", !!trimmed);
+          renderCalendar();
         };
-      }(key, noteBtn, cellDate));
+      }(key, cellDate));
 
       els.calendarGrid.appendChild(cell);
     }
+  }
+
+  function buildNoteTextSpan(note) {
+    var span = document.createElement("span");
+    span.className = "calendar-note-text";
+    span.textContent = note;
+    return span;
   }
 
   // ---------- distribution ----------

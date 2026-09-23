@@ -219,6 +219,27 @@ body {
   background: color-mix(in srgb, var(--primary) 15%, var(--card-bg));
 }
 
+.calendar-note-text {
+  display: none;
+  max-width: 92%;
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+@media (min-width: 561px) {
+  .calendar-note-text {
+    display: block;
+  }
+  .calendar-cell {
+    aspect-ratio: auto;
+    min-height: 64px;
+  }
+}
+
 .calendar-date {
   font-size: 0.72rem;
   color: var(--text-muted);
