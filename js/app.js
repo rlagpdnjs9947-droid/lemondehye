@@ -3,10 +3,17 @@
 
   var STORAGE_KEY = "suneung-planner-state-v2";
   var LEGACY_STORAGE_KEY = "suneung-planner-state-v1";
+  var SYNC_CONFIG_KEY = "suneung-planner-sync-v1";
+  var SYNC_POLL_MS = 6000;
+  var SYNC_PUSH_DEBOUNCE_MS = 1000;
 
   var els = {
     examDate: document.getElementById("exam-date"),
     ddayNumber: document.getElementById("dday-number"),
+    syncDbUrl: document.getElementById("sync-db-url"),
+    syncRoomCode: document.getElementById("sync-room-code"),
+    syncConnectBtn: document.getElementById("sync-connect-btn"),
+    syncStatus: document.getElementById("sync-status"),
     calendarTitle: document.getElementById("calendar-title"),
     calendarGrid: document.getElementById("calendar-grid"),
     calendarPrev: document.getElementById("calendar-prev"),
@@ -20,10 +27,14 @@
   };
 
   var state = loadState();
+  var syncConfig = loadSyncConfig();
+  var syncPushTimer = null;
+  var syncPollTimer = null;
   var calendarCursor = { year: new Date().getFullYear(), month: new Date().getMonth() }; // month is 0-indexed, not persisted
 
   function defaultState() {
     return {
+      updatedAt: 0,
       examDate: "",
       calendarMarks: {},
       calendarNotes: {},
@@ -55,6 +66,7 @@
   }
 
   function sanitizeState(parsed) {
+    if (typeof parsed.updatedAt !== "number") parsed.updatedAt = 0;
     if (typeof parsed.examDate !== "string") parsed.examDate = "";
     if (!parsed.calendarMarks || typeof parsed.calendarMarks !== "object") parsed.calendarMarks = {};
     if (!parsed.calendarNotes || typeof parsed.calendarNotes !== "object") parsed.calendarNotes = {};
@@ -108,19 +120,148 @@
         };
       });
 
-      return { examDate: v1.examDate || "", calendarMarks: {}, calendarNotes: {}, subjects: subjects };
+      return { updatedAt: 0, examDate: v1.examDate || "", calendarMarks: {}, calendarNotes: {}, subjects: subjects };
     } catch (e) {
       return null;
     }
   }
 
-  function saveState() {
+  function persistLocal() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (e) {
       // storage unavailable; ignore
     }
   }
+
+  function saveState() {
+    state.updatedAt = Date.now();
+    persistLocal();
+    schedulePush();
+  }
+
+  // ---------- device sync (Firebase Realtime Database REST API) ----------
+
+  function loadSyncConfig() {
+    try {
+      var raw = localStorage.getItem(SYNC_CONFIG_KEY);
+      if (!raw) return { dbUrl: "", roomCode: "" };
+      var parsed = JSON.parse(raw);
+      return {
+        dbUrl: typeof parsed.dbUrl === "string" ? parsed.dbUrl : "",
+        roomCode: typeof parsed.roomCode === "string" ? parsed.roomCode : "",
+      };
+    } catch (e) {
+      return { dbUrl: "", roomCode: "" };
+    }
+  }
+
+  function saveSyncConfig() {
+    try {
+      localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(syncConfig));
+    } catch (e) {
+      // storage unavailable; ignore
+    }
+  }
+
+  function syncEnabled() {
+    return !!(syncConfig.dbUrl && syncConfig.roomCode);
+  }
+
+  function syncUrl() {
+    var base = syncConfig.dbUrl.replace(/\/+$/, "");
+    return base + "/planner-rooms/" + encodeURIComponent(syncConfig.roomCode) + ".json";
+  }
+
+  function setSyncStatus(text) {
+    if (els.syncStatus) els.syncStatus.textContent = text;
+  }
+
+  function isSafeToApplyRemote() {
+    var active = document.activeElement;
+    if (!active) return true;
+    var tag = active.tagName;
+    return tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT";
+  }
+
+  function schedulePush() {
+    if (!syncEnabled()) return;
+    if (syncPushTimer) clearTimeout(syncPushTimer);
+    syncPushTimer = setTimeout(pushRemote, SYNC_PUSH_DEBOUNCE_MS);
+  }
+
+  function pushRemote() {
+    if (!syncEnabled()) return;
+    fetch(syncUrl(), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state),
+    })
+      .then(function (res) {
+        if (!res.ok) throw new Error("push failed");
+        setSyncStatus("마지막 동기화: 방금 전");
+      })
+      .catch(function () {
+        setSyncStatus("동기화 실패 (URL/연결 확인)");
+      });
+  }
+
+  function pullRemote(onDone) {
+    if (!syncEnabled()) {
+      if (onDone) onDone(false);
+      return;
+    }
+    fetch(syncUrl())
+      .then(function (res) {
+        if (!res.ok) throw new Error("pull failed");
+        return res.json();
+      })
+      .then(function (remote) {
+        var found = !!(remote && typeof remote === "object" && Array.isArray(remote.subjects));
+        if (found) {
+          var localTs = state.updatedAt || 0;
+          var remoteTs = remote.updatedAt || 0;
+          if (remoteTs >= localTs && isSafeToApplyRemote()) {
+            state = remote;
+            sanitizeState(state);
+            persistLocal();
+            render();
+          }
+        }
+        setSyncStatus("마지막 동기화: 방금 전");
+        if (onDone) onDone(found);
+      })
+      .catch(function () {
+        setSyncStatus("동기화 실패 (URL/연결 확인)");
+        if (onDone) onDone(false);
+      });
+  }
+
+  function startSyncPolling() {
+    if (syncPollTimer) clearInterval(syncPollTimer);
+    if (!syncEnabled()) return;
+    syncPollTimer = setInterval(function () { pullRemote(); }, SYNC_POLL_MS);
+  }
+
+  els.syncDbUrl.value = syncConfig.dbUrl;
+  els.syncRoomCode.value = syncConfig.roomCode;
+  setSyncStatus(syncEnabled() ? "연결됨 · 동기화 중..." : "동기화 꺼짐");
+
+  els.syncConnectBtn.addEventListener("click", function () {
+    syncConfig.dbUrl = els.syncDbUrl.value.trim();
+    syncConfig.roomCode = els.syncRoomCode.value.trim();
+    saveSyncConfig();
+    if (syncPollTimer) clearInterval(syncPollTimer);
+    if (!syncEnabled()) {
+      setSyncStatus("동기화 꺼짐");
+      return;
+    }
+    setSyncStatus("연결 중...");
+    pullRemote(function (found) {
+      if (!found) pushRemote();
+      startSyncPolling();
+    });
+  });
 
   // ---------- D-day ----------
 
@@ -644,4 +785,12 @@
   // ---------- init ----------
 
   render();
+
+  if (syncEnabled()) {
+    setSyncStatus("연결됨 · 동기화 중...");
+    pullRemote(function (found) {
+      if (!found) pushRemote();
+      startSyncPolling();
+    });
+  }
 })();

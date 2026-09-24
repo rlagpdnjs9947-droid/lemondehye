@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1024">
 <title>수능 학습 플래너</title>
-<link rel="stylesheet" href="css/style.css?v=12">
+<link rel="stylesheet" href="css/style.css?v=13">
 </head>
 <body>
 <div class="app">
@@ -20,6 +20,23 @@
         <label for="exam-date">수능일</label>
         <input type="date" id="exam-date">
       </div>
+    </div>
+  </section>
+
+  <section class="card" id="sync-card">
+    <h2>기기 간 동기화</h2>
+    <p class="section-hint">Firebase 데이터베이스 URL과 동기화 코드를 모든 기기에 똑같이 입력하고 "동기화 연결"을 누르면, 한 화면에서 바꾼 내용이 자동으로 다른 화면에도 반영돼요.</p>
+    <div class="field">
+      <label for="sync-db-url">Firebase 데이터베이스 URL</label>
+      <input type="text" id="sync-db-url" placeholder="https://xxxx-default-rtdb.firebaseio.com">
+    </div>
+    <div class="field">
+      <label for="sync-room-code">동기화 코드</label>
+      <input type="text" id="sync-room-code" placeholder="모든 기기에 똑같이 입력할 코드 (예: mystudy2026)">
+    </div>
+    <div class="sync-actions">
+      <button id="sync-connect-btn" class="btn primary" type="button">동기화 연결</button>
+      <span id="sync-status" class="sync-status">동기화 꺼짐</span>
     </div>
   </section>
 
@@ -52,6 +69,6 @@
   <p id="empty-message" class="empty-message">과목과 문제집, 블록 개수를 입력한 뒤 "블록 만들기"를 눌러주세요.</p>
 </div>
 
-<script src="js/app.js?v=11"></script>
+<script src="js/app.js?v=12"></script>
 </body>
 </html>
