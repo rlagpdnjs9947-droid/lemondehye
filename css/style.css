@@ -135,16 +135,23 @@ body {
 }
 
 .calendar-cell {
-  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
   cursor: pointer;
   user-select: none;
   position: relative;
-  perspective: 400px;
 }
 
 .calendar-cell.empty {
   visibility: hidden;
   cursor: default;
+}
+
+.flip-wrap {
+  aspect-ratio: 1;
+  position: relative;
+  perspective: 400px;
+  flex-shrink: 0;
 }
 
 .calendar-cell-inner {
@@ -221,22 +228,22 @@ body {
 
 .calendar-note-text {
   display: none;
-  max-width: 92%;
-  font-size: 0.6rem;
+  font-size: 0.62rem;
+  line-height: 1.25;
   color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-top: 1px;
+  white-space: normal;
+  overflow-wrap: break-word;
+  text-align: center;
+  padding: 2px 2px 0;
 }
 
 @media (min-width: 561px) {
   .calendar-note-text {
     display: block;
   }
-  .calendar-cell {
+  .flip-wrap {
     aspect-ratio: auto;
-    min-height: 64px;
+    min-height: 48px;
   }
 }
 

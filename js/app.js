@@ -214,6 +214,9 @@
       if (mark) classes.push("flipped");
       cell.className = classes.join(" ");
 
+      var flipWrap = document.createElement("div");
+      flipWrap.className = "flip-wrap";
+
       var inner = document.createElement("div");
       inner.className = "calendar-cell-inner";
 
@@ -232,7 +235,6 @@
         ddaySpan.textContent = diff === 0 ? "D-DAY" : diff > 0 ? "D-" + diff : "D+" + Math.abs(diff);
         front.appendChild(ddaySpan);
       }
-      if (note) front.appendChild(buildNoteTextSpan(note));
 
       var back = document.createElement("div");
       back.className = "cell-face cell-back";
@@ -240,11 +242,11 @@
       markSpan.className = "calendar-mark";
       markSpan.textContent = mark || "";
       back.appendChild(markSpan);
-      if (note) back.appendChild(buildNoteTextSpan(note));
 
       inner.appendChild(front);
       inner.appendChild(back);
-      cell.appendChild(inner);
+      flipWrap.appendChild(inner);
+      cell.appendChild(flipWrap);
 
       var noteBtn = document.createElement("button");
       noteBtn.type = "button";
@@ -252,6 +254,11 @@
       noteBtn.textContent = note ? "📝" : "+";
       noteBtn.title = note || "메모 추가";
       cell.appendChild(noteBtn);
+
+      // note text lives outside the flipping element (normal document flow)
+      // so it can wrap onto multiple lines and grow the cell instead of
+      // being clipped to the fixed-size flip card
+      if (note) cell.appendChild(buildNoteTextSpan(note));
 
       // update the clicked cell in place (toggle a class, swap the back-face
       // text) instead of re-rendering the whole grid, so the CSS flip
